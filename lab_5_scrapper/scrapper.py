@@ -17,6 +17,7 @@ import shutil
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from urllib.parse import urlparse, urlunparse
 
 
 class IncorrectSeedURLError(Exception):
@@ -185,29 +186,20 @@ class Crawler:
         Initializes an instance of the Crawler class
         """
         self._seed_urls = config._seed_urls
-        self._num_articles = config._num_articles
-        self._headers = config._headers
-        self._encoding = config._encoding
-        self._timeout = config._timeout
-        self._should_verify_certificate = config._should_verify_certificate
+        self._config = config
         self.urls = []
 
-    def _extract_url(self, url) -> list:
+    def _extract_url(self, article_bs: BeautifulSoup) -> str:
         """
         Finds and retrieves URL from HTML
         """
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless=new")
-        driver = webdriver.Chrome(options=options)
-        driver.get(url)
-        new_links = []
-        while len(new_links) < self._num_articles:
-            link_elements = driver.find_elements(By.XPATH, "//a[@class='article-list__title']")
-            new_links = [i.get_attribute('href') for i in link_elements]
-            button = driver.find_element(By.XPATH, "//a[@class='category__more load-more']")
-            button.send_keys(Keys.RETURN)
-            time.sleep(self._timeout)
-        return new_links
+        all_links = article_bs.find_all('a', class_="article-list__title")
+        for link in all_links:
+            try:
+                address = link['href']
+            except KeyError:
+                continue
+            yield address
 
 
     def find_articles(self) -> None:
@@ -215,7 +207,14 @@ class Crawler:
         Finds articles
         """
         for url in self._seed_urls:
-            self.urls.extend(self._extract_url(url))
+            res = make_request(url, self._config)
+            soup = BeautifulSoup(res.content, "html.parser")
+            new_urls = self._extract_url(soup)
+            while len(self.urls) < self._config._num_articles:
+                try:
+                    self.urls.append(next(new_urls))
+                except StopIteration:
+                    break
 
 
     def get_search_urls(self) -> list:
@@ -243,7 +242,7 @@ class HTMLParser:
         """
         Finds text of article
         """
-        text_paragraphs = article_soup.find_all("p", class_="MsoNormal")
+        text_paragraphs = article_soup.find_all("div", class_="article__content")
         self.article.text = ''.join(i.text for i in text_paragraphs)
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
@@ -287,7 +286,7 @@ def main() -> None:
     prepare_environment(ASSETS_PATH)
     crawler = Crawler(config=configuration)
     crawler.find_articles()
-    for i, url in enumerate(crawler.urls):
+    for i, url in enumerate(crawler.urls, start=1):
         parser = HTMLParser(full_url=url, article_id=i, config=configuration)
         article = parser.parse()
         to_raw(article)
