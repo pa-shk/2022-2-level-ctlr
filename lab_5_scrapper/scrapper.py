@@ -258,16 +258,18 @@ class HTMLParser:
         title = article_soup.find('h1', class_="article__title")
         if title:
             self.article.title = title.text
-        day_month = article_soup.find(class_="article__meta-date")
-        year = article_soup.find(class_="footer__copyright")
-        invalid_year = '1000'
-        year = re.search(r'\d{4}', year.text) if year else None
-        year = year.group() if year else None
-        if not year:
-            year = invalid_year
-        if day_month:
-            date = ' '.join((day_month.text, year))
-            self.article.date = self.unify_date_format(date)
+        date = article_soup.find(class_="article__meta-date")
+        if date:
+            date = date.text
+            if not re.search(r'\d{4}', date):
+                curr_year = ' ' + str(datetime.date.today().year)
+                date = re.sub(r'(?<=[А-Яа-я])(?=[,]\s\d{2})', curr_year, date)
+            try:
+                self.unify_date_format(date)
+            except ValueError:
+                pass
+            else:
+                self.article.date = self.unify_date_format(date)
         topics = [topic.text for topic in article_soup.find_all('a', class_="article-list__tag")
               if topic]
         self.article.author = ["NOT FOUND"]
@@ -279,7 +281,7 @@ class HTMLParser:
         Unifies date format
         """
         locale.setlocale(locale.LC_TIME, "ru_RU")
-        return datetime.datetime.strptime(date_str, '%d %b, %H:%M %Y')
+        return datetime.datetime.strptime(date_str, '%d %b  %Y, %H:%M')
 
     def parse(self) -> Union[Article, bool, list]:
         """
