@@ -6,18 +6,22 @@ import json
 import locale
 import random
 import re
-import requests
 import shutil
 import time
-
-from bs4 import BeautifulSoup
 from pathlib import Path
 from typing import List, Dict, Pattern, Union
+from urllib.parse import urlparse
+
+import requests
+from bs4 import BeautifulSoup
 
 from core_utils.article.article import Article
 from core_utils.article.io import to_raw, to_meta
 from core_utils.config_dto import ConfigDTO
-from core_utils.constants import ASSETS_PATH, CRAWLER_CONFIG_PATH
+from core_utils.constants import ASSETS_PATH, \
+                                                                    CRAWLER_CONFIG_PATH, \
+                                                                    NUM_ARTICLES_UPPER_LIMIT, \
+                                                                    TIMEOUT_LOWER_LIMIT, TIMEOUT_UPPER_LIMIT
 
 
 class IncorrectSeedURLError(Exception):
@@ -25,7 +29,7 @@ class IncorrectSeedURLError(Exception):
 
 
 class NumberOfArticlesOutOfRangeError(Exception):
-    pass
+    """ Number of articles either to large or small"""
 
 
 class IncorrectNumberOfArticlesError(Exception):
@@ -111,20 +115,33 @@ class Config:
 
         if not isinstance(seed_urls, list):
             raise IncorrectSeedURLError
-        if not all(re.match(r'https?://.*/', url) for url in seed_urls):
-            raise IncorrectSeedURLError
+
+        correct_url = 'https://lentv24.ru/Novosti.htm'
+        for url in seed_urls:
+            if (not isinstance(url, str)
+                    or not re.match(r'https?://.*/', url)
+                    or urlparse(correct_url).netloc != urlparse(url).netloc):
+                raise IncorrectSeedURLError
+
         if (not isinstance(total_articles_to_find_and_parse, int)
                 or isinstance(total_articles_to_find_and_parse, bool)
                 or total_articles_to_find_and_parse < 1):
             raise IncorrectNumberOfArticlesError
-        if total_articles_to_find_and_parse > 150:
+
+        if total_articles_to_find_and_parse > NUM_ARTICLES_UPPER_LIMIT:
             raise NumberOfArticlesOutOfRangeError
+
         if not isinstance(headers, dict):
             raise IncorrectHeadersError
+
         if not isinstance(encoding, str):
             raise IncorrectEncodingError
-        if not isinstance(timeout, int) or timeout < 0 or timeout > 60:
+
+        if (not isinstance(timeout, int)
+                or timeout < TIMEOUT_LOWER_LIMIT
+                or timeout > TIMEOUT_UPPER_LIMIT):
             raise IncorrectTimeoutError
+
         if not isinstance(verify_certificate, bool) or not isinstance(headless_mode, bool):
             raise IncorrectVerifyError
 
@@ -177,7 +194,8 @@ def make_request(url: str, config: Config) -> requests.models.Response:
     with given configuration
     """
     determined_pause = 0.5
-    time.sleep(determined_pause + random.random())
+    divider = 2
+    time.sleep(determined_pause + random.random() / divider)
     headers = config.get_headers()
     timeout = config.get_timeout()
     response = requests.get(url, headers=headers, timeout=timeout)
@@ -195,11 +213,12 @@ class Crawler:
         """
         Initializes an instance of the Crawler class
         """
-        self._seed_urls = config._seed_urls
+        self._seed_urls = config.get_seed_urls()
         self._config = config
         self.urls = []
 
-    def _extract_url(self, article_bs: BeautifulSoup) -> str:
+    @staticmethod
+    def _extract_url(article_bs: BeautifulSoup) -> str:
         """
         Finds and retrieves URL from HTML
         """
@@ -282,7 +301,8 @@ class HTMLParser:
         if topics:
             self.article.topics = topics
 
-    def unify_date_format(self, date_str: str) -> datetime.datetime:
+    @staticmethod
+    def unify_date_format(date_str: str) -> datetime.datetime:
         """
         Unifies date format
         """
@@ -345,8 +365,6 @@ def main() -> None:
     Entrypoint for scrapper module%b
     """
     configuration = Config(path_to_config=CRAWLER_CONFIG_PATH)
-    configuration._validate_config_content()
-    configuration._extract_config_content()
     prepare_environment(ASSETS_PATH)
     #   ordinary crawler
     crawler = Crawler(config=configuration)
