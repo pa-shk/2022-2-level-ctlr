@@ -196,7 +196,10 @@ class Crawler:
         """
         Finds and retrieves URL from HTML
         """
-        all_links = article_bs.find_all('a', class_="article-list__title")
+        all_links = []
+        all_links.extend(article_bs.find_all('a', class_="article-list__title"))
+        all_links.extend(article_bs.find_all('a', class_="article__embedded"))
+        all_links.extend(article_bs.find_all('a', class_="card__title"))
         for link in all_links:
             try:
                 address = link['href']
@@ -301,6 +304,36 @@ def prepare_environment(base_path: Union[Path, str]) -> None:
     base_path.mkdir(parents=True)
 
 
+class CrawlerRecursive(Crawler):
+    """
+    Recursive crawler implementation
+    """
+    def __init__(self, config: Config) -> None:
+        super().__init__(config)
+        self.start_url = config._seed_urls[0]
+
+    def find_articles(self) -> None:
+        """
+        Finds articles
+        """
+        if len(self.urls) >= self._config._num_articles:
+            return
+        res = make_request(self.start_url, self._config)
+        soup = BeautifulSoup(res.content, "html.parser")
+        page_urls = self._extract_url(soup)
+        new_urls = []
+        while len(self.urls) < self._config._num_articles:
+            try:
+                new_link = next(page_urls)
+                new_urls.append(new_link)
+                self.urls.append(new_link)
+            except StopIteration:
+                break
+        for url in new_urls:
+            self.start_url = url
+            self.find_articles()
+
+
 def main() -> None:
     """
     Entrypoint for scrapper module%b
@@ -309,9 +342,19 @@ def main() -> None:
     configuration._validate_config_content()
     configuration._extract_config_content()
     prepare_environment(ASSETS_PATH)
+    # ordinary crawler
     crawler = Crawler(config=configuration)
     crawler.find_articles()
     for i, url in enumerate(crawler.urls, start=1):
+        parser = HTMLParser(full_url=url, article_id=i, config=configuration)
+        article = parser.parse()
+        to_raw(article)
+        to_meta(article)
+    # recursive crawler
+    prepare_environment(ASSETS_PATH)
+    crawler_recursive = CrawlerRecursive(config=configuration)
+    crawler_recursive.find_articles()
+    for i, url in enumerate(crawler_recursive.urls, start=1):
         parser = HTMLParser(full_url=url, article_id=i, config=configuration)
         article = parser.parse()
         to_raw(article)
