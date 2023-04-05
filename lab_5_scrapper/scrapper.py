@@ -1,30 +1,27 @@
 """
 Crawler implementation
 """
-import time
-from typing import Pattern, Union
-from pathlib import Path
-from core_utils.constants import CRAWLER_CONFIG_PATH, ASSETS_PATH
-from core_utils.config_dto import ConfigDTO
-import requests
-from bs4 import BeautifulSoup
 import datetime
+import json
+import locale
+import random
+import re
+import requests
+import shutil
+import time
+
+from bs4 import BeautifulSoup
+from pathlib import Path
+from typing import List, Dict, Pattern, Union
+
 from core_utils.article.article import Article
 from core_utils.article.io import to_raw, to_meta
-import json
-import re
-import shutil
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from urllib.parse import urlparse, urlunparse
-import datetime
-import locale
-import re
+from core_utils.config_dto import ConfigDTO
+from core_utils.constants import ASSETS_PATH, CRAWLER_CONFIG_PATH
 
 
 class IncorrectSeedURLError(Exception):
-    pass
+    """ Inappropriate value for seed url"""
 
 
 class NumberOfArticlesOutOfRangeError(Exception):
@@ -32,29 +29,37 @@ class NumberOfArticlesOutOfRangeError(Exception):
 
 
 class IncorrectNumberOfArticlesError(Exception):
-    pass
+    """ Inappropriate value for number of articles"""
 
 
 class IncorrectHeadersError(Exception):
-    pass
+    """ Inappropriate value for headers"""
 
 
 class IncorrectEncodingError(Exception):
-    pass
+    """ Inappropriate value for encoding"""
 
 
 class IncorrectTimeoutError(Exception):
-    pass
+    """ Inappropriate value for timeout"""
 
 
 class IncorrectVerifyError(Exception):
-    pass
+    """ Inappropriate value for certificate"""
 
 
 class Config:
     """
     Unpacks and validates configurations
     """
+
+    _seed_urls: List[str]
+    _num_articles: int
+    _headers: Dict[str, str]
+    _encoding: str
+    _timeout: int
+    _headless_mode: bool
+    _should_verify_certificate: bool
 
     def __init__(self, path_to_config: Path) -> None:
         """
@@ -64,14 +69,13 @@ class Config:
         self._validate_config_content()
         self._extract_config_content()
 
-
     def _extract_config_content(self) -> ConfigDTO:
         """
         Returns config values
         """
         with open(self.path_to_config, 'r', encoding='utf-8') as f:
             config_dict = json.load(f)
-        self._seed_urls =  config_dict['seed_urls']
+        self._seed_urls = config_dict['seed_urls']
         self._num_articles = config_dict['total_articles_to_find_and_parse']
         self._headers = config_dict['headers']
         self._encoding = config_dict['encoding']
@@ -107,19 +111,19 @@ class Config:
 
         if not isinstance(seed_urls, list):
             raise IncorrectSeedURLError
-        if not all([re.match(r'https?://.*/', url) for url in seed_urls]):
+        if not all(re.match(r'https?://.*/', url) for url in seed_urls):
             raise IncorrectSeedURLError
         if (not isinstance(total_articles_to_find_and_parse, int)
                 or isinstance(total_articles_to_find_and_parse, bool)
                 or total_articles_to_find_and_parse < 1):
             raise IncorrectNumberOfArticlesError
-        if  total_articles_to_find_and_parse > 150:
+        if total_articles_to_find_and_parse > 150:
             raise NumberOfArticlesOutOfRangeError
         if not isinstance(headers, dict):
             raise IncorrectHeadersError
         if not isinstance(encoding, str):
             raise IncorrectEncodingError
-        if not isinstance(timeout, int) or  timeout < 0 or timeout > 60:
+        if not isinstance(timeout, int) or timeout < 0 or timeout > 60:
             raise IncorrectTimeoutError
         if not isinstance(verify_certificate, bool) or not isinstance(headless_mode, bool):
             raise IncorrectVerifyError
@@ -172,8 +176,11 @@ def make_request(url: str, config: Config) -> requests.models.Response:
     Delivers a response from a request
     with given configuration
     """
-    time.sleep(config._timeout)
-    response = requests.get(url,  headers=config._headers)
+    determined_pause = 0.5
+    time.sleep(determined_pause + random.random())
+    headers = config.get_headers()
+    timeout = config.get_timeout()
+    response = requests.get(url, headers=headers, timeout=timeout)
     return response
 
 
@@ -207,7 +214,6 @@ class Crawler:
                 continue
             yield address
 
-
     def find_articles(self) -> None:
         """
         Finds articles
@@ -216,12 +222,11 @@ class Crawler:
             res = make_request(url, self._config)
             soup = BeautifulSoup(res.content, "html.parser")
             new_urls = self._extract_url(soup)
-            while len(self.urls) < self._config._num_articles:
+            while len(self.urls) < self._config.get_num_articles():
                 try:
                     self.urls.append(next(new_urls))
                 except StopIteration:
                     break
-
 
     def get_search_urls(self) -> list:
         """
@@ -262,16 +267,16 @@ class HTMLParser:
             self.article.title = title.text
         date = article_soup.find(class_="article__meta-date")
         if date:
-            date = date.text
-            if not re.search(r'\d{4}', date):
+            date_text = date.text
+            if not re.search(r'\d{4}', date_text):
                 curr_year = ' ' + str(datetime.date.today().year)
-                date = re.sub(r'(?<=[А-Яа-я])(?=[,]\s\d{2})', curr_year, date)
+                date_text = re.sub(r'(?<=[А-Яа-я])(?=,\s\d{2})', curr_year, date_text)
             try:
-                self.unify_date_format(date)
+                self.unify_date_format(date_text)
             except ValueError:
                 pass
             else:
-                self.article.date = self.unify_date_format(date)
+                self.article.date = self.unify_date_format(date_text)
         topics = [topic.text for topic in article_soup.find_all('a', class_="article-list__tag")]
         self.article.author = ["NOT FOUND"]
         if topics:
@@ -308,21 +313,22 @@ class CrawlerRecursive(Crawler):
     """
     Recursive crawler implementation
     """
+
     def __init__(self, config: Config) -> None:
         super().__init__(config)
-        self.start_url = config._seed_urls[0]
+        self.start_url = config.get_seed_urls()[0]
 
     def find_articles(self) -> None:
         """
         Finds articles
         """
-        if len(self.urls) >= self._config._num_articles:
+        if len(self.urls) >= self._config.get_num_articles():
             return
         res = make_request(self.start_url, self._config)
         soup = BeautifulSoup(res.content, "html.parser")
         page_urls = self._extract_url(soup)
         new_urls = []
-        while len(self.urls) < self._config._num_articles:
+        while len(self.urls) < self._config.get_num_articles():
             try:
                 new_link = next(page_urls)
                 new_urls.append(new_link)
@@ -342,7 +348,7 @@ def main() -> None:
     configuration._validate_config_content()
     configuration._extract_config_content()
     prepare_environment(ASSETS_PATH)
-    # ordinary crawler
+    #   ordinary crawler
     crawler = Crawler(config=configuration)
     crawler.find_articles()
     for i, url in enumerate(crawler.urls, start=1):
@@ -350,7 +356,7 @@ def main() -> None:
         article = parser.parse()
         to_raw(article)
         to_meta(article)
-    # recursive crawler
+    #   recursive crawler
     prepare_environment(ASSETS_PATH)
     crawler_recursive = CrawlerRecursive(config=configuration)
     crawler_recursive.find_articles()
