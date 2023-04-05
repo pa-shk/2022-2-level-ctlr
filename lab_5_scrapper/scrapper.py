@@ -10,7 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 import datetime
 from core_utils.article.article import Article
-from core_utils.article.io import to_raw
+from core_utils.article.io import to_raw, to_meta
 import json
 import re
 import shutil
@@ -18,6 +18,12 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from urllib.parse import urlparse, urlunparse
+import datetime
+import locale
+import re
+# for German locale
+
+#   datetime.datetime.strptime() method.
 
 
 class IncorrectSeedURLError(Exception):
@@ -249,13 +255,31 @@ class HTMLParser:
         """
         Finds meta information of article
         """
-        pass
+        title = article_soup.find('h1', class_="article__title")
+        if title:
+            self.article.title = title.text
+        day_month = article_soup.find(class_="article__meta-date")
+        year = article_soup.find(class_="footer__copyright")
+        invalid_year = '1000'
+        year = re.search(r'\d{4}', year.text) if year else None
+        year = year.group() if year else None
+        if not year:
+            year = invalid_year
+        if day_month:
+            date = ' '.join((day_month.text, year))
+            self.article.date = self.unify_date_format(date)
+        topics = [topic.text for topic in article_soup.find_all('a', class_="article-list__tag")
+              if topic]
+        self.article.author = ["NOT FOUND"]
+        if topics:
+            self.article.topics = topics
 
     def unify_date_format(self, date_str: str) -> datetime.datetime:
         """
         Unifies date format
         """
-        pass
+        locale.setlocale(locale.LC_TIME, "ru_RU")
+        return datetime.datetime.strptime(date_str, '%d %b, %H:%M %Y')
 
     def parse(self) -> Union[Article, bool, list]:
         """
@@ -264,6 +288,7 @@ class HTMLParser:
         page = make_request(self.full_url, self.config)
         article_bs = BeautifulSoup(page.content, "html.parser")
         self._fill_article_with_text(article_bs)
+        self._fill_article_with_meta_information(article_bs)
         return self.article
 
 
@@ -278,7 +303,7 @@ def prepare_environment(base_path: Union[Path, str]) -> None:
 
 def main() -> None:
     """
-    Entrypoint for scrapper module
+    Entrypoint for scrapper module%b
     """
     configuration = Config(path_to_config=CRAWLER_CONFIG_PATH)
     configuration._validate_config_content()
@@ -290,6 +315,7 @@ def main() -> None:
         parser = HTMLParser(full_url=url, article_id=i, config=configuration)
         article = parser.parse()
         to_raw(article)
+        to_meta(article)
 
 
 if __name__ == "__main__":
