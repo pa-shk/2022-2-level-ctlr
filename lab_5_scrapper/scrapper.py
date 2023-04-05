@@ -21,9 +21,6 @@ from urllib.parse import urlparse, urlunparse
 import datetime
 import locale
 import re
-# for German locale
-
-#   datetime.datetime.strptime() method.
 
 
 class IncorrectSeedURLError(Exception):
@@ -248,8 +245,10 @@ class HTMLParser:
         """
         Finds text of article
         """
-        text_paragraphs = article_soup.find_all("div", class_="article__content")
-        self.article.text = ''.join(i.text for i in text_paragraphs)
+        article_content = article_soup.find("div", class_="article__content")
+        text_paragraphs = article_content.find_all("p")
+        text = ''.join(i.text for i in text_paragraphs)
+        self.article.text = re.sub(r'\n+|\s{2,}', ' ', text)
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
         """
@@ -270,8 +269,7 @@ class HTMLParser:
                 pass
             else:
                 self.article.date = self.unify_date_format(date)
-        topics = [topic.text for topic in article_soup.find_all('a', class_="article-list__tag")
-              if topic]
+        topics = [topic.text for topic in article_soup.find_all('a', class_="article-list__tag")]
         self.article.author = ["NOT FOUND"]
         if topics:
             self.article.topics = topics
