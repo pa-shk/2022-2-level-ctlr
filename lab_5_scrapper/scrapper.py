@@ -3,7 +3,6 @@ Crawler implementation
 """
 import datetime
 import json
-import locale
 import random
 import re
 import shutil
@@ -12,44 +11,62 @@ from pathlib import Path
 from typing import List, Dict, Pattern, Union
 from urllib.parse import urlparse
 
+import lxml
 import requests
 from bs4 import BeautifulSoup
 
 from core_utils.article.article import Article
 from core_utils.article.io import to_raw, to_meta
 from core_utils.config_dto import ConfigDTO
-from core_utils.constants import ASSETS_PATH, \
-                                                                    CRAWLER_CONFIG_PATH, \
-                                                                    NUM_ARTICLES_UPPER_LIMIT, \
-                                                                    TIMEOUT_LOWER_LIMIT, TIMEOUT_UPPER_LIMIT
+from core_utils.constants import (
+    ASSETS_PATH,
+    CRAWLER_CONFIG_PATH,
+    NUM_ARTICLES_UPPER_LIMIT,
+    TIMEOUT_LOWER_LIMIT,
+    TIMEOUT_UPPER_LIMIT
+)
 
 
 class IncorrectSeedURLError(Exception):
-    """ Inappropriate value for seed url"""
+    """
+    Inappropriate value for seed url
+    """
 
 
 class NumberOfArticlesOutOfRangeError(Exception):
-    """ Number of articles either to large or small"""
+    """
+    Number of articles either to large or small
+    """
 
 
 class IncorrectNumberOfArticlesError(Exception):
-    """ Inappropriate value for number of articles"""
+    """
+    Inappropriate value for number of articles
+    """
 
 
 class IncorrectHeadersError(Exception):
-    """ Inappropriate value for headers"""
+    """
+    Inappropriate value for headers
+    """
 
 
 class IncorrectEncodingError(Exception):
-    """ Inappropriate value for encoding"""
+    """
+    Inappropriate value for encoding
+    """
 
 
 class IncorrectTimeoutError(Exception):
-    """ Inappropriate value for timeout"""
+    """
+    Inappropriate value for timeout
+    """
 
 
 class IncorrectVerifyError(Exception):
-    """ Inappropriate value for certificate"""
+    """
+     Inappropriate value for certificate
+     """
 
 
 class Config:
@@ -57,21 +74,21 @@ class Config:
     Unpacks and validates configurations
     """
 
-    _seed_urls: List[str]
-    _num_articles: int
-    _headers: Dict[str, str]
-    _encoding: str
-    _timeout: int
-    _headless_mode: bool
-    _should_verify_certificate: bool
-
     def __init__(self, path_to_config: Path) -> None:
         """
         Initializes an instance of the Config class
         """
         self.path_to_config = path_to_config
         self._validate_config_content()
-        self._extract_config_content()
+        self._config_dto = self._extract_config_content()
+        self._seed_urls = self._config_dto.seed_urls
+        self._num_articles = self._config_dto.total_articles
+        self._headers = self._config_dto.headers
+        self._encoding = self._config_dto.encoding
+        self._timeout = self._config_dto.timeout
+        self._should_verify_certificate = self._config_dto.should_verify_certificate
+        self._headless_mode = self._config_dto.headless_mode
+
 
     def _extract_config_content(self) -> ConfigDTO:
         """
@@ -79,23 +96,7 @@ class Config:
         """
         with open(self.path_to_config, 'r', encoding='utf-8') as f:
             config_dict = json.load(f)
-        self._seed_urls = config_dict['seed_urls']
-        self._num_articles = config_dict['total_articles_to_find_and_parse']
-        self._headers = config_dict['headers']
-        self._encoding = config_dict['encoding']
-        self._timeout = config_dict['timeout']
-        self._should_verify_certificate = config_dict['should_verify_certificate']
-        self._headless_mode = config_dict['headless_mode']
-
-        config_instance = ConfigDTO(seed_urls=self._seed_urls,
-                                    headers=self._headers,
-                                    total_articles_to_find_and_parse=self._num_articles,
-                                    encoding=self._encoding,
-                                    timeout=self._timeout,
-                                    should_verify_certificate=self._should_verify_certificate,
-                                    headless_mode=self._headless_mode)
-
-        return config_instance
+        return ConfigDTO(**config_dict)
 
     def _validate_config_content(self) -> None:
         """
@@ -198,8 +199,7 @@ def make_request(url: str, config: Config) -> requests.models.Response:
     time.sleep(determined_pause + random.random() / divider)
     headers = config.get_headers()
     timeout = config.get_timeout()
-    response = requests.get(url, headers=headers, timeout=timeout)
-    return response
+    return requests.get(url, headers=headers, timeout=timeout)
 
 
 class Crawler:
@@ -291,11 +291,9 @@ class HTMLParser:
                 curr_year = ' ' + str(datetime.date.today().year)
                 date_text = re.sub(r'(?<=[А-Яа-я])(?=,\s\d{2})', curr_year, date_text)
             try:
-                self.unify_date_format(date_text)
+                self.article.date = self.unify_date_format(date_text)
             except ValueError:
                 pass
-            else:
-                self.article.date = self.unify_date_format(date_text)
         topics = [topic.text for topic in article_soup.find_all('a', class_="article-list__tag")]
         self.article.author = ["NOT FOUND"]
         if topics:
@@ -306,7 +304,22 @@ class HTMLParser:
         """
         Unifies date format
         """
-        locale.setlocale(locale.LC_TIME, "ru_RU")
+        ru_eng_months = {
+            "янв": "jan",
+            "фев": "feb",
+            "мар": "mar",
+            "апр": "apr",
+            "мая": "may",
+            "июн": "jun",
+            "июл": "jul",
+            "авг": "aug",
+            "сен": "sep",
+            "окт": "oct",
+            "ноя": "nov",
+            "дек": "dec"
+        }
+        ru_month = re.search(r"[А-Яа-я]{3}", date_str).group()
+        date_str = date_str.replace(ru_month, ru_eng_months[ru_month])
         return datetime.datetime.strptime(date_str, '%d %b  %Y, %H:%M')
 
     def parse(self) -> Union[Article, bool, list]:
@@ -372,8 +385,9 @@ def main() -> None:
     for i, url in enumerate(crawler.urls, start=1):
         parser = HTMLParser(full_url=url, article_id=i, config=configuration)
         article = parser.parse()
-        to_raw(article)
-        to_meta(article)
+        if isinstance(article, Article):
+            to_raw(article)
+            to_meta(article)
     #   recursive crawler
     prepare_environment(ASSETS_PATH)
     crawler_recursive = CrawlerRecursive(config=configuration)
@@ -381,8 +395,9 @@ def main() -> None:
     for i, url in enumerate(crawler_recursive.urls, start=1):
         parser = HTMLParser(full_url=url, article_id=i, config=configuration)
         article = parser.parse()
-        to_raw(article)
-        to_meta(article)
+        if isinstance(article, Article):
+            to_raw(article)
+            to_meta(article)
 
 
 if __name__ == "__main__":
