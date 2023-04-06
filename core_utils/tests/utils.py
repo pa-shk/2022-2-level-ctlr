@@ -12,10 +12,10 @@ def universal_setup() -> None:
     Creation of required assets for the core_utils unit tests
     """
     TEST_PATH.mkdir(exist_ok=True)
-    shutil.copyfile(TEST_FILES_FOLDER / "0_raw.txt",
-                    TEST_PATH / "0_raw.txt")
-    shutil.copyfile(TEST_FILES_FOLDER / "0_meta.json",
-                    TEST_PATH / "0_meta.json")
+    shutil.copyfile(TEST_FILES_FOLDER / "1_raw.txt",
+                    TEST_PATH / "1_raw.txt")
+    shutil.copyfile(TEST_FILES_FOLDER / "1_meta.json",
+                    TEST_PATH / "1_meta.json")
 
 
 def copy_student_data() -> None:
