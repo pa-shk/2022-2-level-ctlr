@@ -8,10 +8,9 @@ import re
 import shutil
 import time
 from pathlib import Path
-from typing import List, Dict, Pattern, Union
+from typing import Pattern, Union
 from urllib.parse import urlparse
 
-import lxml
 import requests
 from bs4 import BeautifulSoup
 
@@ -80,14 +79,14 @@ class Config:
         """
         self.path_to_config = path_to_config
         self._validate_config_content()
-        self._config_dto = self._extract_config_content()
-        self._seed_urls = self._config_dto.seed_urls
-        self._num_articles = self._config_dto.total_articles
-        self._headers = self._config_dto.headers
-        self._encoding = self._config_dto.encoding
-        self._timeout = self._config_dto.timeout
-        self._should_verify_certificate = self._config_dto.should_verify_certificate
-        self._headless_mode = self._config_dto.headless_mode
+        config_dto = self._extract_config_content()
+        self._seed_urls = config_dto.seed_urls
+        self._num_articles = config_dto.total_articles
+        self._headers = config_dto.headers
+        self._encoding = config_dto.encoding
+        self._timeout = config_dto.timeout
+        self._should_verify_certificate = config_dto.should_verify_certificate
+        self._headless_mode = config_dto.headless_mode
 
 
     def _extract_config_content(self) -> ConfigDTO:
@@ -117,11 +116,8 @@ class Config:
         if not isinstance(seed_urls, list):
             raise IncorrectSeedURLError
 
-        correct_url = 'https://lentv24.ru/Novosti.htm'
         for url in seed_urls:
-            if (not isinstance(url, str)
-                    or not re.match(r'https?://.*/', url)
-                    or urlparse(correct_url).netloc != urlparse(url).netloc):
+            if not isinstance(url, str)or not re.match(r'https?://.*/', url):
                 raise IncorrectSeedURLError
 
         if (not isinstance(total_articles_to_find_and_parse, int)
@@ -217,8 +213,7 @@ class Crawler:
         self._config = config
         self.urls = []
 
-    @staticmethod
-    def _extract_url(article_bs: BeautifulSoup) -> str:
+    def _extract_url(self, article_bs: BeautifulSoup) -> str:
         """
         Finds and retrieves URL from HTML
         """
@@ -299,8 +294,7 @@ class HTMLParser:
         if topics:
             self.article.topics = topics
 
-    @staticmethod
-    def unify_date_format(date_str: str) -> datetime.datetime:
+    def unify_date_format(self, date_str: str) -> datetime.datetime:
         """
         Unifies date format
         """
@@ -327,7 +321,7 @@ class HTMLParser:
         Parses each article
         """
         page = make_request(self.full_url, self.config)
-        article_bs = BeautifulSoup(page.content, "html.parser")
+        article_bs = BeautifulSoup(page.content, "lxml")
         self._fill_article_with_text(article_bs)
         self._fill_article_with_meta_information(article_bs)
         return self.article
@@ -373,13 +367,12 @@ class CrawlerRecursive(Crawler):
             self.find_articles()
 
 
-def main() -> None:
+def main_1() -> None:
     """
-    Entrypoint for scrapper module%b
+    Entrypoint for scrapper module
     """
     configuration = Config(path_to_config=CRAWLER_CONFIG_PATH)
     prepare_environment(ASSETS_PATH)
-    #   ordinary crawler
     crawler = Crawler(config=configuration)
     crawler.find_articles()
     for i, url in enumerate(crawler.urls, start=1):
@@ -388,7 +381,13 @@ def main() -> None:
         if isinstance(article, Article):
             to_raw(article)
             to_meta(article)
-    #   recursive crawler
+
+
+def main_2() -> None:
+    """
+    Entrypoint for scrapper module
+    """
+    configuration = Config(path_to_config=CRAWLER_CONFIG_PATH)
     prepare_environment(ASSETS_PATH)
     crawler_recursive = CrawlerRecursive(config=configuration)
     crawler_recursive.find_articles()
@@ -401,4 +400,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main_1()
