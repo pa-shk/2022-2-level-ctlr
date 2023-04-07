@@ -333,6 +333,19 @@ class CrawlerRecursive(Crawler):
         super().__init__(config)
         self.start_url = config.get_seed_urls()[0]
 
+        current_path = Path(__file__)
+        crawler_data_path = current_path.parent/ 'crawler_data.json'
+
+        if crawler_data_path.exists():
+            with open('crawler_data.json', 'r', encoding='utf-8') as f:
+                crawler_data = json.load(f)
+                self.urls = crawler_data['urls']
+                self.start_url = crawler_data['start_url']
+        else:
+            crawler_data = {'start_url': self.start_url, 'urls': self.urls}
+            with open('crawler_data.json', 'w', encoding='utf-8') as f:
+                json.dump(crawler_data, f, ensure_ascii=True, indent=4, separators=(', ', ': '))
+
     def find_articles(self) -> None:
         """
         Finds articles
@@ -347,8 +360,18 @@ class CrawlerRecursive(Crawler):
             if len(self.urls) >= self._config.get_num_articles():
                 return
             url = self._extract_url(soup)
+            if url in self.urls:
+                continue
             self.urls.append(url)
             self.start_url = url
+
+            with open('crawler_data.json', 'r', encoding='utf-8') as f:
+                crawler_data = json.load(f)
+            crawler_data['start_url'] = url
+            crawler_data['urls'].append(url)
+            with open('crawler_data.json', 'w', encoding='utf-8') as f:
+                json.dump(crawler_data, f, ensure_ascii=True, indent=4, separators=(', ', ': '))
+
             self.find_articles()
 
 

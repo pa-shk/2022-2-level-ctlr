@@ -1,6 +1,6 @@
 {
     "seed_urls": [
-        "https://lentv24.ru/Novosti.htm",
+        "https://lentv24.ru/Novosti.htm?page=1",
         "https://lentv24.ru/Novosti.htm?page=2",
         "https://lentv24.ru/Novosti.htm?page=3",
         "https://lentv24.ru/Novosti.htm?page=4",
@@ -10,7 +10,7 @@
     ],
     "headers": {
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "accept-encoding": "gzip, deflate, br",
+        "accept-encoding": "deflate, br",
         "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
         "cache-control": "max-age=0",
         "cookie": "tmr_lvid=c07673732bb3ba6cce3be04426701b8c; tmr_lvidTS=1680563540575; _ym_uid=1680563541699734446; _ym_d=1680563541; _ym_isad=1; XSRF-TOKEN=eyJpdiI6ImFjajh2U3gwdU9mbUhURjI1all0Rmc9PSIsInZhbHVlIjoiR0tlWktyRE0zeDhXMGxqem9oV29icGUxQUp4ZUEwVjlyaWhSZ3M4WmNwUjdTZHQwQzBOMEZIenAzUUJlN3hsK3dWbVF0dkFJYjkwWDlRSGdzd2RtSCs2eVBqdUpSc3ZROXIrSnhIOUlvYS9UZ280QWhsSzN5U1YwOXY5b1B5K3MiLCJtYWMiOiI0Y2M2OGQwYWU0M2ZlNjUwYTI3NjM2YzJjYzdjZmFiOGFjNDU3OTIzNjY0OGZlYzVlMzVkMTU3YjE5YmY5NjQ5In0%3D; lentv24_session=eyJpdiI6IkNnbS9GUGZrT214MGhKN0N4cWViL1E9PSIsInZhbHVlIjoicEU3Wjh2Ym9UeUJodXZKMVEzSmZlZC92T2hsemlkK0ZtdUZUbmVKVkxOOVkwdWMzc3ZOZ0RFRGhTeE5lb3RKK3dnUVRBQ05BM3NqaEZvSDZIeXVJSmtpMGZqbW5UVGRITGNsY0t3OVVrallGS0dXR0NWTlZ4OEpIcFZveWpIdkgiLCJtYWMiOiJhY2RiODhlZGRkZTM5ZjdmY2IxYTU4NmI4ZTQxYjhiY2Y5ZGM0MjEzM2YxYTViOGU1NTI1NzI3MDM4YmUzZGMwIn0%3D; tmr_detect=1%7C1680615640244",
@@ -24,7 +24,7 @@
         "sec-fetch-user": "?1",
         "upgrade-insecure-requests": "1",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"},
-    "total_articles_to_find_and_parse": 100,
+    "total_articles_to_find_and_parse": 30,
     "encoding": "utf-8",
     "timeout": 5,
     "should_verify_certificate": true,
