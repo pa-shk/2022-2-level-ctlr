@@ -5,7 +5,7 @@
 3	красиво	красиво	ADV	_	_	0	root	_	_
 4	училась	учиться	VERB	_	Gender=Fem|Number=Sing|Tense=Past	0	root	_	_
 5	в	в	ADP	_	_	0	root	_	_
-6	ПДД	пдд	NOUN	_	Case=Ins|Number=Plur	0	root	_	_
+6	ПДД	пдд	NOUN	_	Animacy=Inan|Case=Nom|Number=Plur	0	root	_	_
 7	по	по	ADP	_	_	0	root	_	_
 8	адресу	адрес	NOUN	_	Animacy=Inan|Case=Dat|Gender=Masc|Number=Sing	0	root	_	_
 9	Львовская	львовский	ADJ	_	Case=Nom|Gender=Fem|Number=Sing	0	root	_	_
