@@ -9,7 +9,6 @@ import shutil
 import time
 from pathlib import Path
 from typing import Pattern, Union
-from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -217,30 +216,23 @@ class Crawler:
         """
         Finds and retrieves URL from HTML
         """
-        all_links = []
-        all_links.extend(article_bs.find_all('a', class_="article-list__title"))
-        all_links.extend(article_bs.find_all('a', class_="article__embedded"))
-        all_links.extend(article_bs.find_all('a', class_="card__title"))
-        for link in all_links:
-            try:
-                address = link['href']
-            except KeyError:
-                continue
-            yield address
+        url = article_bs['href']
+        if isinstance(url, str):
+            return url
+        return url[0]
 
     def find_articles(self) -> None:
         """
         Finds articles
         """
-        for url in self._seed_urls:
-            res = make_request(url, self._config)
-            soup = BeautifulSoup(res.content, "html.parser")
-            new_urls = self._extract_url(soup)
-            while len(self.urls) < self._config.get_num_articles():
-                try:
-                    self.urls.append(next(new_urls))
-                except StopIteration:
-                    break
+        for seed_url in self._seed_urls:
+            res = make_request(seed_url, self._config)
+            soup = BeautifulSoup(res.content, "lxml")
+            for paragraph in soup.find_all('a', class_="article-list__title"):
+                url_ = self._extract_url(paragraph)
+                self.urls.append(url_)
+                if len(self.urls) >= self._config.get_num_articles():
+                    return
 
     def get_search_urls(self) -> list:
         """
@@ -349,20 +341,17 @@ class CrawlerRecursive(Crawler):
         """
         Finds articles
         """
-        if len(self.urls) >= self._config.get_num_articles():
-            return
         res = make_request(self.start_url, self._config)
-        soup = BeautifulSoup(res.content, "html.parser")
-        page_urls = self._extract_url(soup)
-        new_urls = []
-        while len(self.urls) < self._config.get_num_articles():
-            try:
-                new_link = next(page_urls)
-                new_urls.append(new_link)
-                self.urls.append(new_link)
-            except StopIteration:
-                break
-        for url in new_urls:
+        article_bs = BeautifulSoup(res.content, "html.parser")
+        url_bs = []
+        url_bs.extend(article_bs.find_all('a', class_="article-list__title"))
+        url_bs.extend(article_bs.find_all('a', class_="article__embedded"))
+        url_bs.extend(article_bs.find_all('a', class_="card__title"))
+        for soup in url_bs:
+            if len(self.urls) >= self._config.get_num_articles():
+                return
+            url = self._extract_url(soup)
+            self.urls.append(url)
             self.start_url = url
             self.find_articles()
 
