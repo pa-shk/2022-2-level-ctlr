@@ -219,10 +219,13 @@ class Crawler:
             res = make_request(seed_url, self._config)
             soup = BeautifulSoup(res.content, "lxml")
             for paragraph in soup.find_all('a', class_="article-list__title"):
-                url_ = self._extract_url(paragraph)
-                self.urls.append(url_)
                 if len(self.urls) >= self._config.get_num_articles():
                     return
+                try:
+                    url_ = self._extract_url(paragraph)
+                except KeyError:
+                    continue
+                self.urls.append(url_)
 
     def get_search_urls(self) -> list:
         """
@@ -251,8 +254,8 @@ class HTMLParser:
         """
         article_content = article_soup.find("div", class_="article__content")
         text_paragraphs = article_content.find_all("p")
-        text = ''.join(i.text for i in text_paragraphs)
-        self.article.text = re.sub(r'\n+|\s{2,}', ' ', text)
+        text = ' '.join(i.text for i in text_paragraphs)
+        self.article.text = re.sub(r'\s+', ' ', text)
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
         """
@@ -272,9 +275,9 @@ class HTMLParser:
             except ValueError:
                 pass
         topics = [topic.text for topic in article_soup.find_all('a', class_="article-list__tag")]
-        self.article.author = ["NOT FOUND"]
         if topics:
             self.article.topics = topics
+        self.article.author = ["NOT FOUND"]
 
     def unify_date_format(self, date_str: str) -> datetime.datetime:
         """
@@ -326,19 +329,24 @@ class CrawlerRecursive(Crawler):
     def __init__(self, config: Config) -> None:
         super().__init__(config)
         self.start_url = config.get_seed_urls()[0]
+        self._load_crawler_data()
 
+    def _load_crawler_data(self) -> None:
         current_path = Path(__file__)
-        crawler_data_path = current_path.parent/ 'crawler_data.json'
-
+        crawler_data_path = current_path.parent / 'crawler_data.json'
         if crawler_data_path.exists():
             with open('crawler_data.json', 'r', encoding='utf-8') as f:
                 crawler_data = json.load(f)
-                self.urls = crawler_data['urls']
-                self.start_url = crawler_data['start_url']
-        else:
-            crawler_data = {'start_url': self.start_url, 'urls': self.urls}
-            with open('crawler_data.json', 'w', encoding='utf-8') as f:
-                json.dump(crawler_data, f, ensure_ascii=True, indent=4, separators=(', ', ': '))
+            self.urls = crawler_data['urls']
+            self.start_url = crawler_data['start_url']
+
+    def _save_crawler_data(self) -> None:
+        crawler_data = {
+            'start_url': self.start_url,
+            'urls': self.urls
+        }
+        with open('crawler_data.json', 'w', encoding='utf-8') as f:
+            json.dump(crawler_data, f, ensure_ascii=True, indent=4, separators=(', ', ': '))
 
     def find_articles(self) -> None:
         """
@@ -346,26 +354,22 @@ class CrawlerRecursive(Crawler):
         """
         res = make_request(self.start_url, self._config)
         article_bs = BeautifulSoup(res.content, "html.parser")
-        url_bs = []
-        url_bs.extend(article_bs.find_all('a', class_="article-list__title"))
-        url_bs.extend(article_bs.find_all('a', class_="article__embedded"))
-        url_bs.extend(article_bs.find_all('a', class_="card__title"))
-        for soup in url_bs:
+        for soup in (
+                * article_bs.find_all('a', class_="article-list__title"),
+                * article_bs.find_all('a', class_="article__embedded"),
+                * article_bs.find_all('a', class_="card__title")
+        ):
             if len(self.urls) >= self._config.get_num_articles():
                 return
-            url = self._extract_url(soup)
+            try:
+                url = self._extract_url(soup)
+            except KeyError:
+                continue
             if url in self.urls:
                 continue
             self.urls.append(url)
             self.start_url = url
-
-            with open('crawler_data.json', 'r', encoding='utf-8') as f:
-                crawler_data = json.load(f)
-            crawler_data['start_url'] = url
-            crawler_data['urls'].append(url)
-            with open('crawler_data.json', 'w', encoding='utf-8') as f:
-                json.dump(crawler_data, f, ensure_ascii=True, indent=4, separators=(', ', ': '))
-
+            self._save_crawler_data()
             self.find_articles()
 
 
@@ -387,7 +391,7 @@ def main_1() -> None:
 
 def main_2() -> None:
     """
-    Entrypoint for scrapper module
+    Driver code for recursive crawling
     """
     configuration = Config(path_to_config=CRAWLER_CONFIG_PATH)
     prepare_environment(ASSETS_PATH)
