@@ -18,7 +18,7 @@ from core_utils.article.io import (from_meta, from_raw, to_cleaned, to_conllu,
                                    to_meta, to_raw)
 from core_utils.article.ud import (TagConverter,
                                    extract_sentences_from_raw_conllu)
-from core_utils.tests.utils import universal_setup
+from core_utils.tests.utils import TestInputs, universal_setup
 
 
 class ArticleSupplementalTest(unittest.TestCase):
@@ -29,10 +29,7 @@ class ArticleSupplementalTest(unittest.TestCase):
     def setUp(self) -> None:
         article.ASSETS_PATH = TEST_PATH
         universal_setup()
-        self.text = "Мама красиво мыла раму. Мама красиво мыла раму... " \
-                    "Мама красиво мыла раму! Мама красиво мыла раму!!! " \
-                    "Мама красиво мыла раму? Мама красиво мыла раму?! " \
-                    "Мама мыла раму... красиво. Мама сказала: \"Помой раму!\""
+        self.text = TestInputs.text
 
     @pytest.mark.core_utils
     def test_date_from_meta_ideal(self):
@@ -66,10 +63,7 @@ class ArticleSupplementalTest(unittest.TestCase):
         Ensure that split_by_sentence() function
         returns correctly separated sentences
         """
-        sentences = ["Мама красиво мыла раму.", "Мама красиво мыла раму...",
-                     "Мама красиво мыла раму!", "Мама красиво мыла раму!!!",
-                     "Мама красиво мыла раму?", "Мама красиво мыла раму?!",
-                     "Мама мыла раму... красиво.", "Мама сказала: \"Помой раму!\""]
+        sentences = TestInputs.correctly_separated_sentences
 
         error_msg = "Function doesn't return correctly separated sentences"
         self.assertEqual(split_by_sentence(self.text), sentences, error_msg)
@@ -328,28 +322,7 @@ class UDTest(unittest.TestCase):
         extracts and stores sentences correctly
         """
         error_msg = "Function stores sentences from the CONLL-U-formatted article incorrectly"
-        expected = [{
-            'position': '0',
-            'text': 'Красивая - мама красиво, училась в ВШЭ по '
-                    'адресу Львовская 10 лет с почтой test .',
-            'tokens': [
-                '1\tКрасивая\tкрасивый\tADJ\t_\t_\t0\troot\t_\t_',
-                '2\tмама\tмама\tNOUN\t_\t_\t0\troot\t_\t_',
-                '3\tкрасиво\tкрасиво\tADV\t_\t_\t0\troot\t_\t_',
-                '4\tучилась\tучиться\tVERB\t_\t_\t0\troot\t_\t_',
-                '5\tв\tв\tADP\t_\t_\t0\troot\t_\t_',
-                '6\tВШЭ\tВШЭ\tNOUN\t_\t_\t0\troot\t_\t_',
-                '7\tпо\tпо\tADP\t_\t_\t0\troot\t_\t_',
-                '8\tадресу\tадрес\tNOUN\t_\t_\t0\troot\t_\t_',
-                '9\tЛьвовская\tльвовский\tADJ\t_\t_\t0\troot\t_\t_',
-                '10\t10\t10\tNUM\t_\t_\t0\troot\t_\t_',
-                '11\tлет\tгод\tNOUN\t_\t_\t0\troot\t_\t_',
-                '12\tс\tс\tADP\t_\t_\t0\troot\t_\t_',
-                '13\tпочтой\tпочта\tNOUN\t_\t_\t0\troot\t_\t_',
-                '14\ttest\ttest\tNOUN\t_\t_\t0\troot\t_\t_',
-                '15\t.\t.\tPUNCT\t_\t_\t0\troot\t_\t_'
-            ]
-        }]
+        expected = TestInputs.extracted_sentences_from_conllu
 
         with open(file=self.path,
                   mode='r',
