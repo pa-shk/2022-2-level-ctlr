@@ -83,7 +83,6 @@ class Config:
         self._should_verify_certificate = config_dto.should_verify_certificate
         self._headless_mode = config_dto.headless_mode
 
-
     def _extract_config_content(self) -> ConfigDTO:
         """
         Returns config values
@@ -97,44 +96,36 @@ class Config:
         Ensure configuration parameters
         are not corrupt
         """
-        with open(self.path_to_config, 'r', encoding='utf-8') as f:
-            config_dict = json.load(f)
+        config_dto = self._extract_config_content()
 
-        seed_urls = config_dict['seed_urls']
-        headers = config_dict['headers']
-        total_articles_to_find_and_parse = config_dict['total_articles_to_find_and_parse']
-        encoding = config_dict['encoding']
-        timeout = config_dict['timeout']
-        verify_certificate = config_dict['should_verify_certificate']
-        headless_mode = config_dict['headless_mode']
-
-        if not isinstance(seed_urls, list):
+        if not isinstance(config_dto.seed_urls, list):
             raise IncorrectSeedURLError
 
-        for url in seed_urls:
-            if not isinstance(url, str)or not re.match(r'https?://.*/', url):
+        for url in config_dto.seed_urls:
+            if not isinstance(url, str) or not re.match(r'https?://.*/', url):
                 raise IncorrectSeedURLError
 
-        if (not isinstance(total_articles_to_find_and_parse, int)
-                or isinstance(total_articles_to_find_and_parse, bool)
-                or total_articles_to_find_and_parse < 1):
+        if (not isinstance(config_dto.total_articles, int)
+                or isinstance(config_dto.total_articles, bool)
+                or config_dto.total_articles < 1):
             raise IncorrectNumberOfArticlesError
 
-        if total_articles_to_find_and_parse > NUM_ARTICLES_UPPER_LIMIT:
+        if config_dto.total_articles > NUM_ARTICLES_UPPER_LIMIT:
             raise NumberOfArticlesOutOfRangeError
 
-        if not isinstance(headers, dict):
+        if not isinstance(config_dto.headers, dict):
             raise IncorrectHeadersError
 
-        if not isinstance(encoding, str):
+        if not isinstance(config_dto.encoding, str):
             raise IncorrectEncodingError
 
-        if (not isinstance(timeout, int)
-                or timeout < TIMEOUT_LOWER_LIMIT
-                or timeout > TIMEOUT_UPPER_LIMIT):
+        if (not isinstance(config_dto.timeout, int)
+                or config_dto.timeout < TIMEOUT_LOWER_LIMIT
+                or config_dto.timeout > TIMEOUT_UPPER_LIMIT):
             raise IncorrectTimeoutError
 
-        if not isinstance(verify_certificate, bool) or not isinstance(headless_mode, bool):
+        if (not isinstance(config_dto.should_verify_certificate, bool)
+                or not isinstance(config_dto.headless_mode, bool)):
             raise IncorrectVerifyError
 
     def get_seed_urls(self) -> list[str]:
@@ -190,7 +181,10 @@ def make_request(url: str, config: Config) -> requests.models.Response:
     time.sleep(determined_pause + random.random() / divider)
     headers = config.get_headers()
     timeout = config.get_timeout()
-    return requests.get(url, headers=headers, timeout=timeout)
+    return requests.get(url,
+                        headers=headers,
+                        timeout=timeout,
+                        verify=config.get_verify_certificate())
 
 
 class Crawler:
