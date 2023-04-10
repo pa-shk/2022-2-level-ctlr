@@ -176,15 +176,17 @@ def make_request(url: str, config: Config) -> requests.models.Response:
     Delivers a response from a request
     with given configuration
     """
-    determined_pause = 0.5
-    divider = 2
+    determined_pause = 0.25
+    divider = 4
     time.sleep(determined_pause + random.random() / divider)
     headers = config.get_headers()
     timeout = config.get_timeout()
-    return requests.get(url,
-                        headers=headers,
-                        timeout=timeout,
-                        verify=config.get_verify_certificate())
+    return requests.get(
+        url,
+        headers=headers,
+        timeout=timeout,
+        verify=config.get_verify_certificate()
+    )
 
 
 class Crawler:
