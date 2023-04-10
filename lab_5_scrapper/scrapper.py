@@ -176,8 +176,8 @@ def make_request(url: str, config: Config) -> requests.models.Response:
     Delivers a response from a request
     with given configuration
     """
-    determined_pause = 0.25
-    divider = 4
+    determined_pause = 0.1
+    divider = 8
     time.sleep(determined_pause + random.random() / divider)
     headers = config.get_headers()
     timeout = config.get_timeout()
