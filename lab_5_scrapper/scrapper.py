@@ -3,10 +3,8 @@ Crawler implementation
 """
 import datetime
 import json
-import random
 import re
 import shutil
-import time
 from pathlib import Path
 from typing import Pattern, Union
 
@@ -176,16 +174,14 @@ def make_request(url: str, config: Config) -> requests.models.Response:
     Delivers a response from a request
     with given configuration
     """
-    divider = 10
-    time.sleep(random.random() / divider)
-    headers = config.get_headers()
-    timeout = config.get_timeout()
-    return requests.get(
+    response = requests.get(
         url,
-        headers=headers,
-        timeout=timeout,
+        headers=config.get_headers(),
+        timeout=config.get_timeout(),
         verify=config.get_verify_certificate()
     )
+    response.encoding = config.get_encoding()
+    return response
 
 
 class Crawler:
@@ -207,10 +203,10 @@ class Crawler:
         """
         Finds and retrieves URL from HTML
         """
-        url = article_bs['href']
+        url = article_bs.get('href')
         if isinstance(url, str):
             return url
-        return url[0]
+        return ''
 
     def find_articles(self) -> None:
         """
@@ -222,11 +218,10 @@ class Crawler:
             for paragraph in soup.find_all('a', class_="article-list__title"):
                 if len(self.urls) >= self._config.get_num_articles():
                     return
-                try:
-                    url_ = self._extract_url(paragraph)
-                except KeyError:
+                url = self._extract_url(paragraph)
+                if not url or url in self.urls:
                     continue
-                self.urls.append(url_)
+                self.urls.append(url)
 
     def get_search_urls(self) -> list:
         """
@@ -255,8 +250,7 @@ class HTMLParser:
         """
         article_content = article_soup.find("div", class_="article__content")
         text_paragraphs = article_content.find_all("p")
-        text = ' '.join(i.text for i in text_paragraphs)
-        self.article.text = re.sub(r'\s+', ' ', text)
+        self.article.text = ' '.join(i.text.strip() for i in text_paragraphs)
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
         """
@@ -267,12 +261,8 @@ class HTMLParser:
             self.article.title = title.text
         date = article_soup.find(class_="article__meta-date")
         if date:
-            date_text = date.text
-            if not re.search(r'\d{4}', date_text):
-                curr_year = ' ' + str(datetime.date.today().year)
-                date_text = re.sub(r'(?<=[А-Яа-я])(?=,\s\d{2})', curr_year, date_text)
             try:
-                self.article.date = self.unify_date_format(date_text)
+                self.article.date = self.unify_date_format(date.text)
             except ValueError:
                 pass
         topics = [topic.text for topic in article_soup.find_all('a', class_="article-list__tag")]
@@ -284,6 +274,10 @@ class HTMLParser:
         """
         Unifies date format
         """
+        if not re.search(r'\d{4}', date_str):
+            curr_year = ' ' + str(datetime.date.today().year)
+            date_str = re.sub(r'(?<=[А-Яа-я])(?=,\s\d{2})', curr_year, date_str)
+
         ru_eng_months = {
             "янв": "jan",
             "фев": "feb",
@@ -298,6 +292,7 @@ class HTMLParser:
             "ноя": "nov",
             "дек": "dec"
         }
+
         ru_month = re.search(r"[А-Яа-я]{3}", date_str).group()
         date_str = date_str.replace(ru_month, ru_eng_months[ru_month])
         return datetime.datetime.strptime(date_str, '%d %b  %Y, %H:%M')
@@ -374,7 +369,7 @@ class CrawlerRecursive(Crawler):
             self.find_articles()
 
 
-def main_1() -> None:
+def main() -> None:
     """
     Entrypoint for scrapper module
     """
@@ -390,7 +385,7 @@ def main_1() -> None:
             to_meta(article)
 
 
-def main_2() -> None:
+def main_recursive() -> None:
     """
     Driver code for recursive crawling
     """
@@ -407,4 +402,4 @@ def main_2() -> None:
 
 
 if __name__ == "__main__":
-    main_1()
+    main()
