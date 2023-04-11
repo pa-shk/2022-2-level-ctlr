@@ -3,8 +3,10 @@ Crawler implementation
 """
 import datetime
 import json
+import random
 import re
 import shutil
+import time
 from pathlib import Path
 from typing import Pattern, Union
 
@@ -181,6 +183,7 @@ def make_request(url: str, config: Config) -> requests.models.Response:
         verify=config.get_verify_certificate()
     )
     response.encoding = config.get_encoding()
+    time.sleep(random.uniform(0.2, 0.3))
     return response
 
 
