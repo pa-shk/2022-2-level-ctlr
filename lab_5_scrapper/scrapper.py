@@ -275,8 +275,8 @@ class HTMLParser:
         Unifies date format
         """
         if not re.search(r'\d{4}', date_str):
-            curr_year = ' ' + str(datetime.date.today().year)
-            date_str = re.sub(r'(?<=[А-Яа-я])(?=,\s\d{2})', curr_year, date_str)
+            curr_year = datetime.date.today().year
+            date_str = re.sub(r'(?<=[А-Яа-я])(?=,\s\d{2})', f' {curr_year}', date_str)
 
         ru_eng_months = {
             "янв": "jan",
@@ -357,11 +357,8 @@ class CrawlerRecursive(Crawler):
         ):
             if len(self.urls) >= self._config.get_num_articles():
                 return
-            try:
-                url = self._extract_url(soup)
-            except KeyError:
-                continue
-            if url in self.urls:
+            url = self._extract_url(soup)
+            if not url or url in self.urls:
                 continue
             self.urls.append(url)
             self.start_url = url
