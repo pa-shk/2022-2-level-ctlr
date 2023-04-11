@@ -181,7 +181,6 @@ def make_request(url: str, config: Config) -> requests.models.Response:
         verify=config.get_verify_certificate()
     )
     response.encoding = config.get_encoding()
-    response.raise_for_status()
     return response
 
 
