@@ -183,7 +183,7 @@ def make_request(url: str, config: Config) -> requests.models.Response:
         verify=config.get_verify_certificate()
     )
     response.encoding = config.get_encoding()
-    time.sleep(random.uniform(0.2, 0.3))
+    time.sleep(random.uniform(0.1, 0.3))
     return response
 
 
