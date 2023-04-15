@@ -9,6 +9,7 @@ import shutil
 import time
 from pathlib import Path
 from typing import Pattern, Union
+from urllib.parse import urlparse, urlunparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -102,7 +103,7 @@ class Config:
             raise IncorrectSeedURLError
 
         for url in config_dto.seed_urls:
-            if not isinstance(url, str) or not re.match(r'https?://.*/', url):
+            if not isinstance(url, str) or not re.match(r'https?://.*', url):
                 raise IncorrectSeedURLError
 
         if (not isinstance(config_dto.total_articles, int)
@@ -206,10 +207,19 @@ class Crawler:
         """
         Finds and retrieves URL from HTML
         """
+        target_netloc = 'lentv24.ru'
+        scheme = 'https'
+
         url = article_bs.get('href')
-        if isinstance(url, str):
-            return url
-        return ''
+        if not isinstance(url, str):
+            return ''
+        parsed_url = urlparse(url)
+        if parsed_url.netloc != target_netloc:
+            return ''
+        if not parsed_url.netloc:
+            return urlunparse((scheme, target_netloc, parsed_url.path,
+                               None, None, None))
+        return url
 
     def find_articles(self) -> None:
         """
@@ -253,24 +263,18 @@ class HTMLParser:
         """
         article_content = article_soup.find("div", class_="article__content")
         text_paragraphs = article_content.find_all("p")
-        self.article.text = ' '.join(i.text.strip() for i in text_paragraphs)
+        article_text = ' '.join(i.text for i in text_paragraphs)
+        self.article.text = re.sub(r'\s+', ' ', article_text)
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
         """
         Finds meta information of article
         """
-        title = article_soup.find('h1', class_="article__title")
-        if title:
-            self.article.title = title.text
+        self.article.title = article_soup.find('h1', class_="article__title").text
         date = article_soup.find(class_="article__meta-date")
-        if date:
-            try:
-                self.article.date = self.unify_date_format(date.text)
-            except ValueError:
-                pass
-        topics = [topic.text for topic in article_soup.find_all('a', class_="article-list__tag")]
-        if topics:
-            self.article.topics = topics
+        self.article.date = self.unify_date_format(date.text)
+        self.article.topics = [topic.text for
+                               topic in article_soup.find_all('a', class_="article-list__tag")]
         self.article.author = ["NOT FOUND"]
 
     def unify_date_format(self, date_str: str) -> datetime.datetime:
@@ -328,6 +332,7 @@ class CrawlerRecursive(Crawler):
     def __init__(self, config: Config) -> None:
         super().__init__(config)
         self.start_url = config.get_seed_urls()[0]
+        self.all_urls = []
         self._load_crawler_data()
 
     def _load_crawler_data(self) -> None:
@@ -336,13 +341,13 @@ class CrawlerRecursive(Crawler):
         if crawler_data_path.exists():
             with open('crawler_data.json', 'r', encoding='utf-8') as f:
                 crawler_data = json.load(f)
-            self.urls = crawler_data['urls']
-            self.start_url = crawler_data['start_url']
+            self.start_url, self.urls, self.all_urls = crawler_data.values()
 
     def _save_crawler_data(self) -> None:
         crawler_data = {
             'start_url': self.start_url,
-            'urls': self.urls
+            'urls': self.urls,
+            'all_urls': self.all_urls
         }
         with open('crawler_data.json', 'w', encoding='utf-8') as f:
             json.dump(crawler_data, f, ensure_ascii=True, indent=4, separators=(', ', ': '))
@@ -352,18 +357,17 @@ class CrawlerRecursive(Crawler):
         Finds articles
         """
         res = make_request(self.start_url, self._config)
-        article_bs = BeautifulSoup(res.content, "html.parser")
-        for soup in (
-                * article_bs.find_all('a', class_="article-list__title"),
-                * article_bs.find_all('a', class_="article__embedded"),
-                * article_bs.find_all('a', class_="card__title")
-        ):
+        soup = BeautifulSoup(res.content, 'lxml')
+        relevant_urls = [*map(self._extract_url, soup.find_all(
+            "a", {"class": ["article-list__title",  "article__embedded", "card__title"]}))]
+        for url in map(self._extract_url, soup.find_all('a')):
             if len(self.urls) >= self._config.get_num_articles():
                 return
-            url = self._extract_url(soup)
-            if not url or url in self.urls:
+            if not url or url in self.all_urls:
                 continue
-            self.urls.append(url)
+            self.all_urls.append(url)
+            if url in relevant_urls:
+                self.urls.append(url)
             self.start_url = url
             self._save_crawler_data()
             self.find_articles()
@@ -402,4 +406,5 @@ def main_recursive() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    main_recursive()
