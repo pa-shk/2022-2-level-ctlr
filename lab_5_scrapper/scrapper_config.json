@@ -1,6 +1,12 @@
 {
     "seed_urls": [
-        "https://lentv24.ru"
+        "https://lentv24.ru/Novosti.htm?page=1",
+        "https://lentv24.ru/Novosti.htm?page=2",
+        "https://lentv24.ru/Novosti.htm?page=3",
+        "https://lentv24.ru/Novosti.htm?page=4",
+        "https://lentv24.ru/Novosti.htm?page=5",
+        "https://lentv24.ru/Novosti.htm?page=6",
+        "https://lentv24.ru/Novosti.htm?page=7"
     ],
     "headers": {
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
