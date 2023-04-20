@@ -263,8 +263,7 @@ class HTMLParser:
         """
         article_content = article_soup.find("div", class_="article__content")
         text_paragraphs = article_content.find_all("p")
-        article_text = ' '.join(i.text for i in text_paragraphs)
-        self.article.text = re.sub(r'\s+', ' ', article_text)
+        self.article.text = ' '.join(i.text.strip() for i in text_paragraphs)
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
         """
@@ -331,17 +330,18 @@ class CrawlerRecursive(Crawler):
 
     def __init__(self, config: Config) -> None:
         super().__init__(config)
-        self.start_url = config.get_seed_urls()[0]
+        self.start_url = self._seed_urls[0]
         self.all_urls = []
         self._load_crawler_data()
 
     def _load_crawler_data(self) -> None:
-        current_path = Path(__file__)
-        crawler_data_path = current_path.parent / 'crawler_data.json'
+        crawler_data_path = Path(__file__).parent.parent / 'build' / 'crawler_data.json'
         if crawler_data_path.exists():
-            with open('crawler_data.json', 'r', encoding='utf-8') as f:
+            with open(crawler_data_path, 'r', encoding='utf-8') as f:
                 crawler_data = json.load(f)
-            self.start_url, self.urls, self.all_urls = crawler_data.values()
+            self.start_url = crawler_data['start_url']
+            self.urls = crawler_data['urls']
+            self.all_urls = crawler_data['all_urls']
 
     def _save_crawler_data(self) -> None:
         crawler_data = {
@@ -349,7 +349,8 @@ class CrawlerRecursive(Crawler):
             'urls': self.urls,
             'all_urls': self.all_urls
         }
-        with open('crawler_data.json', 'w', encoding='utf-8') as f:
+        crawler_data_path = Path(__file__).parent.parent / 'build' / 'crawler_data.json'
+        with open(crawler_data_path, 'w', encoding='utf-8') as f:
             json.dump(crawler_data, f, ensure_ascii=True, indent=4, separators=(', ', ': '))
 
     def find_articles(self) -> None:
