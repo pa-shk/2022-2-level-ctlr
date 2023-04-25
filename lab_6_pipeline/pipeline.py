@@ -203,7 +203,7 @@ class MorphologicalAnalysisPipeline:
         """
         Performs basic preprocessing and writes processed text to files
         """
-        for article in self._corpus.get_articles().keys():
+        for article in self._corpus.get_articles().values():
             article.set_conllu_sentences(self._process(article.text))
             to_cleaned(article)
 
