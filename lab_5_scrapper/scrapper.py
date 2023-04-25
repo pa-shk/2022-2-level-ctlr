@@ -407,5 +407,5 @@ def main_recursive() -> None:
 
 
 if __name__ == "__main__":
-    # main()
-    main_recursive()
+    main()
+    # main_recursive()
