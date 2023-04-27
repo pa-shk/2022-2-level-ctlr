@@ -264,7 +264,7 @@ class HTMLParser:
         article_content = article_soup.find("div", class_="article__content")
         text_paragraphs = article_content.find_all("p")
         self.article.text = ' '.join(i.text for i in text_paragraphs)
-        self.article.text = re.sub('\s+', ' ', self.article.text)
+        self.article.text = re.sub(r'\s+', ' ', self.article.text)
 
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
