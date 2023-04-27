@@ -2,11 +2,14 @@
 Pipeline for CONLL-U formatting
 """
 from pathlib import Path
+import string
 from typing import List
 import re
 
+from pymystem3 import Mystem
+
 from core_utils.article.article import SentenceProtocol, Article, split_by_sentence
-from core_utils.article.io import to_cleaned, from_raw
+from core_utils.article.io import to_cleaned, from_raw, to_conllu
 from core_utils.article.ud import OpencorporaTagProtocol, TagConverter
 from core_utils.constants import ASSETS_PATH
 
@@ -82,6 +85,9 @@ class MorphologicalTokenDTO:
         """
         Initializes MorphologicalTokenDTO
         """
+        self.lemma = lemma
+        self.pos = pos
+        self.tags = tags
 
 class ConlluToken:
     """
@@ -93,21 +99,40 @@ class ConlluToken:
         Initializes ConlluToken
         """
         self._text = text
+        self._morphological_parameters = MorphologicalTokenDTO()
+        self._position = 0
 
     def set_morphological_parameters(self, parameters: MorphologicalTokenDTO) -> None:
         """
         Stores the morphological parameters
         """
+        self._morphological_parameters = parameters
+
+    def set_position(self, postion: int) -> None:
+        self._position = postion
 
     def get_morphological_parameters(self) -> MorphologicalTokenDTO:
         """
         Returns morphological parameters from ConlluToken
         """
+        return self._morphological_parameters
 
     def get_conllu_text(self, include_morphological_tags: bool) -> str:
         """
         String representation of the token for conllu files
         """
+        position = str(self._position)
+        text = self._text
+        lemma = self._morphological_parameters.lemma
+        pos = self._morphological_parameters.pos
+        xpos = '_'
+        feats = '_'
+        head = '0'
+        deprel = 'root'
+        deps = '_'
+        misc = '_'
+
+        return '\t'.join([position, text, lemma, pos, xpos, feats, head, deprel, deps, misc])
 
     def get_cleaned(self) -> str:
         """
@@ -132,6 +157,7 @@ class ConlluSentence(SentenceProtocol):
         """
         Creates string representation of the sentence
         """
+        return self._format_tokens(include_morphological_tags)
 
     def get_cleaned_sentence(self) -> str:
         """
@@ -143,7 +169,10 @@ class ConlluSentence(SentenceProtocol):
         """
         Returns sentences from ConlluSentence
         """
-
+    def _format_tokens(self, include_morphological_tags: bool) -> str:
+        return (f'# sent_id = {self._position}\n# text = {self._text}\n'
+                +  '\n'.join(i.get_conllu_text(include_morphological_tags) for i in self._tokens)
+                + '\n')
 
 class MystemTagConverter(TagConverter):
     """
@@ -159,6 +188,8 @@ class MystemTagConverter(TagConverter):
         """
         Extracts and converts the POS from the Mystem tags into the UD format
         """
+        pos = re.match(r'\w+', tags)[0]
+        return self._tag_mapping[self.pos][pos]
 
 
 class OpenCorporaTagConverter(TagConverter):
@@ -193,9 +224,36 @@ class MorphologicalAnalysisPipeline:
         Returns the text representation as the list of ConlluSentence
         """
         sentences = []
-        for position, sentence in enumerate(split_by_sentence(text)):
-            tokens = [ConlluToken(i) for i in sentence.split()]
-            sentence = ConlluSentence(position, sentence, tokens)
+        result = Mystem().analyze(re.sub(r'\W+', ' ', text))
+        mapping_path = Path(__file__).parent / 'data' / 'mystem_tags_mapping.json'
+        converter = MystemTagConverter(mapping_path)
+        token_count = 0
+        for sentence_position, sentence in enumerate(split_by_sentence(text)):
+            conllu_tokens = []
+            for token_position, token in enumerate(re.findall(r'\w+', sentence), start=1):
+                conlu_token = ConlluToken(token)
+                if not result[token_count]['text'].isalnum():
+                    token_count += 1
+                if 'analysis' in result[token_count] and result[token_count]['analysis']:
+                    lex = result[token_count]['analysis'][0]['lex']
+                    pos = converter.convert_pos(result[token_count]['analysis'][0]['gr'])
+                elif result[token_count]['text'].isdigit():
+                    lex = result[token_count]['text']
+                    pos = 'NUM'
+                else:
+                    lex = result[token_count]['text']
+                    pos = 'NOUN'
+                morph_params = MorphologicalTokenDTO(lex, pos)
+                conlu_token.set_position(token_position)
+                conlu_token.set_morphological_parameters(morph_params)
+                conllu_tokens.append(conlu_token)
+                token_count += 1
+            end_token = ConlluToken('.')
+            end_token.set_position(token_position + 1)
+            morph_params = MorphologicalTokenDTO('.',  'PUNCT')
+            end_token.set_morphological_parameters(morph_params)
+            conllu_tokens.append(end_token)
+            sentence = ConlluSentence(sentence_position, sentence, conllu_tokens)
             sentences.append(sentence)
         return sentences
 
@@ -206,6 +264,7 @@ class MorphologicalAnalysisPipeline:
         for article in self._corpus.get_articles().values():
             article.set_conllu_sentences(self._process(article.text))
             to_cleaned(article)
+            to_conllu(article, False, False)
 
 class AdvancedMorphologicalAnalysisPipeline(MorphologicalAnalysisPipeline):
     """
