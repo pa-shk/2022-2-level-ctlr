@@ -180,6 +180,7 @@ class MystemTagConverter(TagConverter):
         Converts the Mystem tags into the UD format
         """
 
+
     def convert_pos(self, tags: str) -> str:  # type: ignore
         """
         Extracts and converts the POS from the Mystem tags into the UD format
