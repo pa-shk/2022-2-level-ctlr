@@ -57,7 +57,6 @@ class CorpusManager:
             if not all(i.stat().st_size for i in files):
                 raise InconsistentDatasetError
 
-
     def _scan_dataset(self) -> None:
         """
         Register each dataset entry
@@ -65,10 +64,7 @@ class CorpusManager:
         for path in self.path_to_raw_txt_data.glob('**/*.txt'):
             if not (relevant:= re.search(r'(\d+)_raw', path.stem)):
                 continue
-            article = Article(url=None, article_id=int(relevant[1]))
-            from_raw(path, article)
-            self._storage[int(relevant[1])] = article
-
+            self._storage[int(relevant[1])] = from_raw(path)
 
     def get_articles(self) -> dict:
         """
@@ -218,25 +214,26 @@ class MorphologicalAnalysisPipeline:
         Initializes MorphologicalAnalysisPipeline
         """
         self._corpus = corpus_manager
+        self._stemmer = Mystem()
+        mapping_path = Path(__file__).parent / 'data' / 'mystem_tags_mapping.json'
+        self._converter = MystemTagConverter(mapping_path)
 
     def _process(self, text: str) -> List[ConlluSentence]:
         """
         Returns the text representation as the list of ConlluSentence
         """
         sentences = []
-        result = Mystem().analyze(re.sub(r'\W+', ' ', text))
-        mapping_path = Path(__file__).parent / 'data' / 'mystem_tags_mapping.json'
-        converter = MystemTagConverter(mapping_path)
+        result = self._stemmer.analyze(re.sub(r'\W+', ' ', text))
         token_count = 0
         for sentence_position, sentence in enumerate(split_by_sentence(text)):
             conllu_tokens = []
             for token_position, token in enumerate(re.findall(r'\w+', sentence), start=1):
-                conlu_token = ConlluToken(token)
+                conllu_token = ConlluToken(token)
                 if not result[token_count]['text'].isalnum():
                     token_count += 1
                 if 'analysis' in result[token_count] and result[token_count]['analysis']:
                     lex = result[token_count]['analysis'][0]['lex']
-                    pos = converter.convert_pos(result[token_count]['analysis'][0]['gr'])
+                    pos = self._converter.convert_pos(result[token_count]['analysis'][0]['gr'])
                 elif result[token_count]['text'].isdigit():
                     lex = result[token_count]['text']
                     pos = 'NUM'
@@ -244,9 +241,9 @@ class MorphologicalAnalysisPipeline:
                     lex = result[token_count]['text']
                     pos = 'NOUN'
                 morph_params = MorphologicalTokenDTO(lex, pos)
-                conlu_token.set_position(token_position)
-                conlu_token.set_morphological_parameters(morph_params)
-                conllu_tokens.append(conlu_token)
+                conllu_token.set_position(token_position)
+                conllu_token.set_morphological_parameters(morph_params)
+                conllu_tokens.append(conllu_token)
                 token_count += 1
             end_token = ConlluToken('.')
             end_token.set_position(token_position + 1)
