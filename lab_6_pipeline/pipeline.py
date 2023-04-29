@@ -169,6 +169,8 @@ class ConlluSentence(SentenceProtocol):
         """
         Returns sentences from ConlluSentence
         """
+        return self._tokens
+
     def _format_tokens(self, include_morphological_tags: bool) -> str:
         return (f'# sent_id = {self._position}\n# text = {self._text}\n'
                 +  '\n'.join(i.get_conllu_text(include_morphological_tags) for i in self._tokens)
