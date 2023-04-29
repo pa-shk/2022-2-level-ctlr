@@ -1,0 +1,56 @@
+{
+    "POS": {
+        "NOUN": "NOUN",
+        "NPRO": "PRON",
+        "ADJF": "ADJ",
+        "ADJS": "ADJ",
+        "COMP": "ADJ",
+        "ANUM": "ADJ",
+        "ADPRO": "ADJ",
+        "VERB": "VERB",
+        "INFN": "VERB",
+        "PRTF": "ADJ",
+        "PRTS": "ADJ",
+        "GRND": "VERB",
+        "NUMR": "NUM",
+        "ADVB": "ADV",
+        "PRED": "ADV",
+        "PREP": "ADP",
+        "CONJ": "CCONJ",
+        "PRCL": "PART",
+        "INTJ": "INTJ",
+        "X": "X"
+    },
+    "Case": {
+        "nomn": "Nom",
+        "gent": "Gen",
+        "datv": "Dat",
+        "accs": "Acc",
+        "ablt": "Ins",
+        "loct": "Loc",
+        "voct": "Voc",
+        "gen1": "Gen",
+        "gen2": "Par",
+        "loc1": "Loc",
+        "loc2": "Loc",
+        "acc2": "Acc"
+    },
+    "Number": {
+        "sing": "Sing",
+        "plur": "Plur"
+    },
+    "Gender": {
+        "masc": "Masc",
+        "femn": "Fem",
+        "neut": "Neut"
+    },
+    "Animacy": {
+        "anim": "Anim",
+        "inan": "Inan"
+    },
+    "Tense": {
+        "pres": "Pres",
+        "futr": "Imp",
+        "past": "Past"
+    }
+}
