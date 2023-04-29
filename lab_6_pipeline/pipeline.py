@@ -321,13 +321,15 @@ class AdvancedMorphologicalAnalysisPipeline(MorphologicalAnalysisPipeline):
                 if not result[token_count]['text'].isalnum():
                     token_count += 1
                 if 'analysis' in result[token_count] and result[token_count]['analysis']:
-                    lex = result[token_count]['analysis'][0]['lex']
                     pos = self._converter.convert_pos(result[token_count]['analysis'][0]['gr'])
                     if pos == 'NOUN':
+                        lex = self._backup_analyzer.parse(result[token_count]['text'])[0].normal_form
                         open_corpora_tags = self._backup_analyzer.parse(result[token_count]['text'])[0].tag
+                        pos = self._backup_tag_converter.convert_pos(open_corpora_tags)
                         tags = self._backup_tag_converter.convert_morphological_tags(open_corpora_tags)
                     else:
                         tags = self._converter.convert_morphological_tags(result[token_count]['analysis'][0]['gr'])
+                        lex = result[token_count]['analysis'][0]['lex']
                 elif result[token_count]['text'].isdigit():
                     lex = result[token_count]['text']
                     pos = 'NUM'

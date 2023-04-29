@@ -17,28 +17,14 @@ def from_conllu(path: Path, article: Optional[Article] = None) -> Article:
     """
     with open(path, encoding='utf-8') as f:
         content = f.read()
-    extracted_senteces = extract_sentences_from_raw_conllu(content)
-    for sentences in extracted_senteces:
-        conllu_tokens = []
-        for token in sentences['tokens']:
-            params = token.split('\t')
-            position = params[0]
-            text = params[1]
-            lemma = params[2]
-            pos = params[3]
-            conllu_token = ConlluToken(text)
-            conllu_token.set_position(position)
-            morph_params = MorphologicalTokenDTO(lemma, pos)
-            conllu_token.set_morphological_parameters(morph_params)
-            conllu_tokens.append(conllu_token)
-        sentences['tokens'] = conllu_tokens
-    conllu_senteces = [ConlluSentence(**senteces) for senteces in extracted_senteces]
-    if article:
-        article.set_conllu_sentences(conllu_senteces)
-    else:
+    extracted_sentences = extract_sentences_from_raw_conllu(content)
+    for sentence in extracted_sentences:
+        sentence['tokens'] = [_parse_conllu_token(token) for token in  sentence['tokens']]
+    conllu_senteces = [ConlluSentence(**sentence) for sentence in extracted_sentences]
+    if not article:
         article_id = int(re.match(r'\d+', path.stem).group())
         article = Article(None, article_id)
-        article.set_conllu_sentences(conllu_senteces)
+    article.set_conllu_sentences(conllu_senteces)
     return article
 
 
@@ -49,6 +35,16 @@ def _parse_conllu_token(token_line: str) -> ConlluToken:
     Example:
     '2	произошло	происходить	VERB	_	Gender=Neut|Number=Sing|Tense=Past	0	root	_	_'
     """
+    params = token_line.split('\t')
+    position = int(params[0])
+    text = params[1]
+    lemma = params[2]
+    pos = params[3]
+    token = ConlluToken(text)
+    token.set_position(position)
+    morph_params = MorphologicalTokenDTO(lemma, pos)
+    token.set_morphological_parameters(morph_params)
+    return token
 
 
 # pylint: disable=too-few-public-methods
