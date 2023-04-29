@@ -131,7 +131,7 @@ class ConlluToken:
         deps = '_'
         misc = '_'
 
-        return '\t'.join(filter(bool, (position, text, lemma, pos, xpos, feats, head, deprel, deps, misc)))
+        return '\t'.join([position, text, lemma, pos, xpos, feats, head, deprel, deps, misc])
 
     def get_cleaned(self) -> str:
         """
@@ -235,7 +235,7 @@ class MorphologicalAnalysisPipeline:
         Returns the text representation as the list of ConlluSentence
         """
         sentences = []
-        result = self._stemmer.analyze(re.sub(r'\W+', ' ', text))
+        result = self._stemmer.analyze(text) #re.sub(r'\W+', ' ', text))
         token_count = 0
         for sentence_position, sentence in enumerate(split_by_sentence(text)):
             conllu_tokens = []
