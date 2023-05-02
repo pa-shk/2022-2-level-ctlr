@@ -212,7 +212,7 @@ class OpenCorporaTagConverter(TagConverter):
         """
         Extracts and converts POS from the OpenCorpora tags into the UD format
         """
-        return self._tag_mapping[self.pos][tags.POS]
+        return self._tag_mapping[self.pos][tags.POS or 'UNKN']
 
     def convert_morphological_tags(self, tags: OpencorporaTagProtocol) -> str:  # type: ignore
         """
@@ -336,7 +336,7 @@ class AdvancedMorphologicalAnalysisPipeline(MorphologicalAnalysisPipeline):
                     tags = ''
                 else:
                     lex = result[token_count]['text']
-                    pos = 'NOUN'
+                    pos = 'X'
                     tags = ''
                 morph_params = MorphologicalTokenDTO(lex, pos, tags)
                 conllu_token.set_position(token_position)

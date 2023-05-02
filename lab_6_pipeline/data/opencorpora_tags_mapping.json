@@ -19,7 +19,7 @@
         "CONJ": "CCONJ",
         "PRCL": "PART",
         "INTJ": "INTJ",
-        "X": "X"
+        "UNKN": "X"
     },
     "Case": {
         "nomn": "Nom",
