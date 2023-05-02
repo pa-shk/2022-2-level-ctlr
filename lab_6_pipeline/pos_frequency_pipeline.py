@@ -2,14 +2,20 @@
 Implementation of POSFrequencyPipeline for score ten only.
 """
 import re
-from typing import Optional
 from pathlib import Path
+from typing import Optional
+
 from core_utils.article.article import Article, ArtifactType
-from core_utils.article.io import to_meta
-from lab_6_pipeline.pipeline import ConlluToken, CorpusManager, MorphologicalTokenDTO, ConlluSentence
+from core_utils.article.io import from_meta, to_meta
 from core_utils.article.ud import extract_sentences_from_raw_conllu
 from core_utils.constants import ASSETS_PATH
 from core_utils.visualizer import visualize
+from lab_6_pipeline.pipeline import (ConlluSentence, ConlluToken,
+                                     CorpusManager, MorphologicalTokenDTO)
+
+
+class EmptyFileError(Exception):
+    pass
 
 
 def from_conllu(path: Path, article: Optional[Article] = None) -> Article:
@@ -66,8 +72,12 @@ class POSFrequencyPipeline:
         Visualizes the frequencies of each part of speech
         """
         for article in self._corpus.get_articles().values():
-            path = article.get_file_path(ArtifactType.POS_CONLLU)
-            article = from_conllu(path)
+            conllu_path = article.get_file_path(ArtifactType.MORPHOLOGICAL_CONLLU)
+            if not conllu_path.stat().st_size:
+                raise EmptyFileError
+            article = from_conllu(conllu_path)
+            meta_file_path = article.get_meta_file_path()
+            article = from_meta(meta_file_path, article)
             frequencies = self._count_frequencies(article)
             article.set_pos_info(frequencies)
             to_meta(article)
