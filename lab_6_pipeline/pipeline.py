@@ -263,7 +263,7 @@ class MorphologicalAnalysisPipeline:
                     tags = ''
                 else:
                     lex = result[token_count]['text']
-                    pos = 'NOUN'
+                    pos = 'X'
                     tags = ''
                 morph_params = MorphologicalTokenDTO(lex, pos, tags)
                 conllu_token.set_position(token_position)

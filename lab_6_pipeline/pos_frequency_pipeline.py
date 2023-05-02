@@ -5,6 +5,7 @@ import re
 from typing import Optional
 from pathlib import Path
 from core_utils.article.article import Article, ArtifactType
+from core_utils.article.io import to_meta
 from lab_6_pipeline.pipeline import ConlluToken, CorpusManager, MorphologicalTokenDTO, ConlluSentence
 from core_utils.article.ud import extract_sentences_from_raw_conllu
 from core_utils.constants import ASSETS_PATH
@@ -69,6 +70,7 @@ class POSFrequencyPipeline:
             article = from_conllu(path)
             frequencies = self._count_frequencies(article)
             article.set_pos_info(frequencies)
+            to_meta(article)
             visualize(article=article,
                       path_to_save=ASSETS_PATH / f'{article.article_id}_image.png')
 
