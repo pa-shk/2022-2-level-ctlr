@@ -15,14 +15,20 @@ from core_utils.article.ud import OpencorporaTagProtocol, TagConverter
 from core_utils.constants import ASSETS_PATH
 
 
-
 # pylint: disable=too-few-public-methods
 class InconsistentDatasetError(Exception):
-    pass
+    """
+    IDs contain slips or
+    number of meta and raw files is not equal or
+    files are empty
+    """
 
 
 class EmptyDirectoryError(Exception):
-    pass
+    """
+    Directory is empty
+    """
+
 
 class CorpusManager:
     """

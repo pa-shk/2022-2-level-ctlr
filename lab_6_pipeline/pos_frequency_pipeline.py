@@ -15,7 +15,9 @@ from lab_6_pipeline.pipeline import (ConlluSentence, ConlluToken,
 
 
 class EmptyFileError(Exception):
-    pass
+    """
+    File is empty
+    """
 
 
 def from_conllu(path: Path, article: Optional[Article] = None) -> Article:
