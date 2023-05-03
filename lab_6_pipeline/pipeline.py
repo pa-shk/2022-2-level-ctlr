@@ -370,7 +370,6 @@ class AdvancedMorphologicalAnalysisPipeline(MorphologicalAnalysisPipeline):
         """
         for article in self._corpus.get_articles().values():
             article.set_conllu_sentences(self._process(article.text))
-            to_cleaned(article)
             to_conllu(article,
                       include_morphological_tags=True,
                       include_pymorphy_tags=True)
