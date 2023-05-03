@@ -2,10 +2,13 @@
 Implementation of POSFrequencyPipeline for score ten only.
 """
 import re
+from collections import Counter
+from itertools import chain
 from pathlib import Path
 from typing import Optional
 
-from core_utils.article.article import Article, ArtifactType
+from core_utils.article.article import (Article, ArtifactType,
+                                        get_article_id_from_filepath)
 from core_utils.article.io import from_meta, to_meta
 from core_utils.article.ud import extract_sentences_from_raw_conllu
 from core_utils.constants import ASSETS_PATH
@@ -29,11 +32,11 @@ def from_conllu(path: Path, article: Optional[Article] = None) -> Article:
     extracted_sentences = extract_sentences_from_raw_conllu(content)
     for sentence in extracted_sentences:
         sentence['tokens'] = [_parse_conllu_token(token) for token in  sentence['tokens']]
-    conllu_senteces = [ConlluSentence(**sentence) for sentence in extracted_sentences]
+    conllu_sentences = [ConlluSentence(**sentence) for sentence in extracted_sentences]
     if not article:
-        article_id = int(re.match(r'\d+', path.stem).group())
+        article_id = get_article_id_from_filepath(path)
         article = Article(None, article_id)
-    article.set_conllu_sentences(conllu_senteces)
+    article.set_conllu_sentences(conllu_sentences)
     return article
 
 
@@ -91,12 +94,9 @@ class POSFrequencyPipeline:
         """
         Counts POS frequency in Article
         """
-        frequencies = {}
-        for sentences in article.get_conllu_sentences():
-            for token in sentences.get_tokens():
-                pos = token.get_morphological_parameters().pos
-                frequencies[pos] = frequencies.get(pos, 0) + 1
-        return frequencies
+        tokens = chain.from_iterable((i.get_tokens() for i in article.get_conllu_sentences()))
+        pos = (i.get_morphological_parameters().pos for i in tokens)
+        return dict(Counter(pos))
 
 
 def main() -> None:

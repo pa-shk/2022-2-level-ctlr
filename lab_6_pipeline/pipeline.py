@@ -54,8 +54,8 @@ class CorpusManager:
             raise NotADirectoryError
         if not any(self.path_to_raw_txt_data.iterdir()):
             raise  EmptyDirectoryError
-        meta_files = [i for i in self.path_to_raw_txt_data.glob('**/*.json') if  re.match(r'\d+_meta', i.stem)]
-        text_files = [i for i in self.path_to_raw_txt_data.glob('**/*.txt') if re.match(r'\d+_raw', i.stem)]
+        meta_files = [i for i in self.path_to_raw_txt_data.glob(r'*_meta.json')]
+        text_files = [i for i in self.path_to_raw_txt_data.glob(r'*_raw.txt')]
         if len(meta_files) != len(text_files):
             raise InconsistentDatasetError
         for files in meta_files, text_files:
@@ -129,10 +129,10 @@ class ConlluToken:
         lemma = self._morphological_parameters.lemma
         pos = self._morphological_parameters.pos
         xpos = '_'
-        feats = '_'
-        if include_morphological_tags:
-            if tags := self._morphological_parameters.tags:
+        if include_morphological_tags and (tags := self._morphological_parameters.tags):
                 feats = tags
+        else:
+            feats = '_'
         head = '0'
         deprel = 'root'
         deps = '_'
@@ -163,7 +163,11 @@ class ConlluSentence(SentenceProtocol):
         """
         Creates string representation of the sentence
         """
-        return self._format_tokens(include_morphological_tags)
+        return (
+            f'# sent_id = {self._position}\n'
+            f'# text = {self._text}\n'
+            f'{self._format_tokens(include_morphological_tags)}\n'
+        )
 
     def get_cleaned_sentence(self) -> str:
         """
@@ -178,9 +182,7 @@ class ConlluSentence(SentenceProtocol):
         return self._tokens
 
     def _format_tokens(self, include_morphological_tags: bool) -> str:
-        return (f'# sent_id = {self._position}\n# text = {self._text}\n'
-                +  '\n'.join(i.get_conllu_text(include_morphological_tags) for i in self._tokens)
-                + '\n')
+        return  '\n'.join(i.get_conllu_text(include_morphological_tags) for i in self._tokens)
 
 class MystemTagConverter(TagConverter):
     """
@@ -191,6 +193,8 @@ class MystemTagConverter(TagConverter):
         """
         Converts the Mystem tags into the UD format
         """
+        if re.match(r'\w+', tags)[0] in ["PART", "PR", "INTJ", "CONJ", "COM", "ADVPRO", "ADV"]:
+            return ''
         tags = re.sub(r'\((.+?)\|.+\)', r'\1', tags)
         extracted_tags = re.findall(r'[а-я]+', tags)
         ud_tags = {}
@@ -242,7 +246,7 @@ class MorphologicalAnalysisPipeline:
         Initializes MorphologicalAnalysisPipeline
         """
         self._corpus = corpus_manager
-        self._stemmer = Mystem()
+        self._mystem_analyzer = Mystem()
         mapping_path = Path(__file__).parent / 'data' / 'mystem_tags_mapping.json'
         self._converter = MystemTagConverter(mapping_path)
 
@@ -251,7 +255,7 @@ class MorphologicalAnalysisPipeline:
         Returns the text representation as the list of ConlluSentence
         """
         sentences = []
-        result = self._stemmer.analyze(re.sub(r'\W+', ' ', text))
+        result = self._mystem_analyzer.analyze(re.sub(r'\W+', ' ', text))
         token_count = 0
         for sentence_position, sentence in enumerate(split_by_sentence(text)):
             conllu_tokens = []
@@ -318,7 +322,7 @@ class AdvancedMorphologicalAnalysisPipeline(MorphologicalAnalysisPipeline):
         Returns the text representation as the list of ConlluSentence
         """
         sentences = []
-        result = self._stemmer.analyze(re.sub(r'\W+', ' ', text))
+        result = self._mystem_analyzer.analyze(re.sub(r'\W+', ' ', text))
         token_count = 0
         for sentence_position, sentence in enumerate(split_by_sentence(text)):
             conllu_tokens = []
