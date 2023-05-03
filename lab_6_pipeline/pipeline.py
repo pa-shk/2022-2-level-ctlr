@@ -228,13 +228,15 @@ class OpenCorporaTagConverter(TagConverter):
         """
         Converts the OpenCorpora tags into the UD format
         """
-        ud_tags = {}
-        for category in ( 'animacy', 'case', 'gender', 'number'):
-            if not (open_corpora_tag := eval(f'tags.{category}')):
-                continue
-            ud_tags[eval(f'self.{category}')] = eval(f"self._tag_mapping[self.{category}]['{open_corpora_tag}']")
-        return '|'.join(f'{k}={v}' for k, v in ud_tags.items())
+        parsed_tags = {
+            self.animacy: tags.animacy,
+            self.case: tags.case,
+            self.gender: tags.gender,
+            self.number:  tags.number
+        }
 
+        return '|'.join(f'{category}={self._tag_mapping[category][value]}'
+                        for category, value in parsed_tags.items() if value)
 
 class MorphologicalAnalysisPipeline:
     """
