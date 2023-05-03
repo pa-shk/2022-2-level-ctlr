@@ -144,7 +144,7 @@ class ConlluToken:
         """
         Returns lowercase original form of a token
         """
-        return re.sub(r'[^\w\s]+', '', self._text).lower()
+        return re.sub(r'\W+', '', self._text).lower()
 
 class ConlluSentence(SentenceProtocol):
     """
@@ -257,39 +257,51 @@ class MorphologicalAnalysisPipeline:
         Returns the text representation as the list of ConlluSentence
         """
         sentences = []
-        result = self._mystem_analyzer.analyze(re.sub(r'\W+', ' ', text))
-        token_count = 0
+        result = (i for i in self._mystem_analyzer.analyze(text))
         for sentence_position, sentence in enumerate(split_by_sentence(text)):
+            token_position = 1
             conllu_tokens = []
-            for token_position, token in enumerate(re.findall(r'\w+', sentence), start=1):
-                conllu_token = ConlluToken(token)
-                if not result[token_count]['text'].isalnum():
-                    token_count += 1
-                if 'analysis' in result[token_count] and result[token_count]['analysis']:
-                    lex = result[token_count]['analysis'][0]['lex']
-                    pos = self._converter.convert_pos(result[token_count]['analysis'][0]['gr'])
-                    tags = self._converter.convert_morphological_tags(result[token_count]['analysis'][0]['gr'])
-                elif result[token_count]['text'].isdigit():
-                    lex = result[token_count]['text']
-                    pos = 'NUM'
-                    tags = ''
+            end_of_sentence_flag = False
+            while not end_of_sentence_flag:
+                analyzed_token = next(result)
+                conllu_token = ConlluToken(analyzed_token['text'])
+                end_of_sentence_flag = self._check_end_of_sentence(analyzed_token['text'], conllu_tokens, sentence)
+                if not re.match(r'\w', analyzed_token['text']) and not end_of_sentence_flag:
+                    continue
+                if 'analysis' in analyzed_token and analyzed_token['analysis']:
+                    lex = analyzed_token['analysis'][0]['lex']
+                    pos = self._converter.convert_pos(analyzed_token['analysis'][0]['gr'])
+                    tags = self._converter.convert_morphological_tags(analyzed_token['analysis'][0]['gr'])
                 else:
-                    lex = result[token_count]['text']
-                    pos = 'X'
-                    tags = ''
-                morph_params = MorphologicalTokenDTO(lex, pos, tags)
-                conllu_token.set_position(token_position)
-                conllu_token.set_morphological_parameters(morph_params)
+                    lex, pos, tags = self._analyze_unknown(analyzed_token['text'])
+                self._set_postion_and_morph_parameters(conllu_token, token_position, lex, pos, tags)
                 conllu_tokens.append(conllu_token)
-                token_count += 1
-            end_token = ConlluToken('.')
-            end_token.set_position(token_position + 1)
-            morph_params = MorphologicalTokenDTO('.',  'PUNCT')
-            end_token.set_morphological_parameters(morph_params)
-            conllu_tokens.append(end_token)
+                token_position += 1
             sentence = ConlluSentence(sentence_position, sentence, conllu_tokens)
             sentences.append(sentence)
         return sentences
+
+    @staticmethod
+    def _set_postion_and_morph_parameters(conllu_token: ConlluToken, postion, lex, pos, tags) -> None:
+        morph_params = MorphologicalTokenDTO(lex, pos, tags)
+        conllu_token.set_position(postion)
+        conllu_token.set_morphological_parameters(morph_params)
+
+    def _analyze_unknown(self, lex):
+        tags = ''
+        if lex == '.' or lex == '. ':
+            lex = '.'
+            pos = 'PUNCT'
+        elif lex.isdigit():
+            pos = 'NUM'
+        else:
+            pos = 'X'
+        return lex, pos, tags
+
+    def _check_end_of_sentence(self, text, conllu_tokens, sentence):
+        return (text.strip() == '.' and
+                ''.join(i.get_cleaned() for i in conllu_tokens) == re.sub('\W+', '', sentence.lower()))
+
 
     def run(self) -> None:
         """
