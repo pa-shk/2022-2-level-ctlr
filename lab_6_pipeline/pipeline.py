@@ -1,16 +1,17 @@
 """
 Pipeline for CONLL-U formatting
 """
-from pathlib import Path
-import string
-from typing import List
 import re
+import string
+from pathlib import Path
+from typing import Generator, List
 
 import pymorphy2
 from pymystem3 import Mystem
 
-from core_utils.article.article import SentenceProtocol, Article, split_by_sentence
-from core_utils.article.io import to_cleaned, from_raw, to_conllu
+from core_utils.article.article import (Article, SentenceProtocol,
+                                        split_by_sentence)
+from core_utils.article.io import from_raw, to_cleaned, to_conllu
 from core_utils.article.ud import OpencorporaTagProtocol, TagConverter
 from core_utils.constants import ASSETS_PATH
 
@@ -197,30 +198,20 @@ class MystemTagConverter(TagConverter):
         """
         Converts the Mystem tags into the UD format
         """
-        categories = {
-            "NOUN": [self.case, self.number, self.gender, self.animacy],
-            "VERB": [self.tense, self.number, self.gender],
-            "ADJ": [self.case, self.number, self.gender],
-            "NUM": [self.case, self.number, self.gender],
-            "PRON": [self.case, self.number, self.gender, self.animacy],
-        }
-
-
-
         pos = self.convert_pos(tags)
-        if pos in ["PART", "ADP",  "ADV", "CCONJ", "INTJ"]:
+        if pos in ["PART", "ADP", "ADV", "CCONJ", "INTJ"]:
             return ''
 
         tags = re.sub(r'\((.+?)\|.+\)', r'\1', tags)
         extracted_tags = re.findall(r'[а-я]+', tags)
         ud_tags = {}
         for tag in extracted_tags:
-            for category in (self.gender, self.animacy, self.case, self.number, self.tense):
+            for category in (self.animacy, self.case, self.gender, self.number, self.tense):
                 if (pos == 'NOUN' or pos == 'PRON') and category == self.tense:
                     continue
                 if (pos == 'ADJ' or pos == 'NUM') and category in [self.animacy, self.tense]:
                     continue
-                if pos == 'VERB' and category in  [self.animacy, self.case]:
+                if pos == 'VERB' and category in [self.animacy, self.case]:
                     continue
                 if pos == 'NUM' and category in [self.animacy, self.tense]:
                     continue
@@ -300,7 +291,10 @@ class MorphologicalAnalysisPipeline:
         return conllu_sentences
 
     @staticmethod
-    def _create_conllu_token(postion, text, lex, pos, tags) -> ConlluToken:
+    def _create_conllu_token(postion: int, text: str, lex: str, pos: str, tags: str) -> ConlluToken:
+        """
+        Creates a ConlluToken and fills its fields
+        """
         conllu_token = ConlluToken(text)
         morph_params = MorphologicalTokenDTO(lex, pos, tags)
         conllu_token.set_position(postion)
@@ -308,7 +302,11 @@ class MorphologicalAnalysisPipeline:
         return conllu_token
 
     @staticmethod
-    def _analyze_unknown(lex):
+    def _analyze_unknown(lex: str) -> str:
+        """
+        Deduces the part of spech of a lexeme
+        if analyzer failed to do it
+        """
         if lex == '.':
             return 'PUNCT'
         if lex.isdigit():
@@ -316,7 +314,10 @@ class MorphologicalAnalysisPipeline:
         return 'X'
 
     @staticmethod
-    def get_sentence_tokens(result, sentence) -> dict:
+    def get_sentence_tokens(result: Generator, sentence: str) -> Generator[dict, None, None]:
+        """
+        Extracts all tokens containing either letters or numbers
+        """
         while re.search(r'\w', sentence):
             token = next(result)
             if token['text'] not in sentence:
