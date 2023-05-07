@@ -256,62 +256,50 @@ class MorphologicalAnalysisPipeline:
         """
         Returns the text representation as the list of ConlluSentence
         """
-        sentences = []
-        # text = ' '.join(split_by_sentence(text))
+        conllu_sentences = []
         result = (i for i in self._mystem_analyzer.analyze(text))
         for sentence_position, sentence in enumerate(split_by_sentence(text)):
-            analyzed_tokens, conllu_tokens = self.get_sentence_tokens(result, sentence)
-            for analyzed_token, conllu_token in zip(analyzed_tokens, conllu_tokens):
-                if 'analysis' in analyzed_token and analyzed_token['analysis']:
-                    lex = analyzed_token['analysis'][0]['lex']
-                    pos = self._converter.convert_pos(analyzed_token['analysis'][0]['gr'])
-                    tags = self._converter.convert_morphological_tags(analyzed_token['analysis'][0]['gr'])
+            conllu_tokens = []
+            for token_position, token in enumerate(self.get_sentence_tokens(result, sentence), start=1):
+                if 'analysis' in token and token['analysis']:
+                    lex = token['analysis'][0]['lex']
+                    pos = self._converter.convert_pos(token['analysis'][0]['gr'])
+                    tags = self._converter.convert_morphological_tags(token['analysis'][0]['gr'])
                 else:
-                    lex, pos, tags = self._analyze_unknown(analyzed_token['text'])
-                self._set_postion_and_morph_parameters(conllu_token, lex, pos, tags)
-            sentence = ConlluSentence(sentence_position, sentence, conllu_tokens)
-            sentences.append(sentence)
-        return sentences
+                    tags, lex = '', token['text']
+                    pos = self._analyze_unknown(lex)
+                conllu_token = self._create_conllu_token(token_position, token['text'], lex, pos, tags)
+                conllu_tokens.append(conllu_token)
+            conllu_sentence = ConlluSentence(sentence_position, sentence, conllu_tokens)
+            conllu_sentences.append(conllu_sentence)
+        return conllu_sentences
 
     @staticmethod
-    def _set_postion_and_morph_parameters(conllu_token: ConlluToken, lex, pos, tags) -> None:
+    def _create_conllu_token(postion, text, lex, pos, tags) -> ConlluToken:
+        conllu_token = ConlluToken(text)
         morph_params = MorphologicalTokenDTO(lex, pos, tags)
+        conllu_token.set_position(postion)
         conllu_token.set_morphological_parameters(morph_params)
+        return conllu_token
 
-    def _analyze_unknown(self, lex):
-        tags = ''
-        if lex == '.' or lex == '. ':
-            lex = '.'
-            pos = 'PUNCT'
-        elif lex.isdigit():
-            pos = 'NUM'
-        else:
-            pos = 'X'
-        return lex, pos, tags
+    @staticmethod
+    def _analyze_unknown(lex):
+        if lex == '.':
+            return  'PUNCT'
+        if lex.isdigit():
+            return 'NUM'
+        return  'X'
 
-    def _check_end_of_sentence(self, text, conllu_tokens, sentence):
-        return (text.strip() == '.' and
-                ''.join(i.get_cleaned() for i in conllu_tokens) == re.sub('\W+', '', sentence.lower()))
-
-    def get_sentence_tokens(self, result, sentence):
-        conllu_tokens = []
-        analyzed_tokens = []
-        token_position = 1
-        while True:
-            analyzed_token = next(result)
-            conllu_token = ConlluToken(analyzed_token['text'])
-            if ''.join(i.get_cleaned() for i in conllu_tokens) == re.sub('\W+', '', sentence.lower()):
-                break
-            if not re.match(r'\w', analyzed_token['text']):
+    @staticmethod
+    def get_sentence_tokens(result, sentence) -> dict:
+        while re.search(r'\w', sentence):
+            token = next(result)
+            if token['text'] not in sentence:
                 continue
-            conllu_token.set_position(token_position)
-            token_position += 1
-            conllu_tokens.append(conllu_token)
-            analyzed_tokens.append(analyzed_token)
-        analyzed_tokens.append({'text': '.'})
-        conllu_tokens.append(ConlluToken('.'))
-        return analyzed_tokens, conllu_tokens
-
+            sentence = re.sub(re.escape(token['text']), '', sentence, 1)
+            if re.search(r'\w', token['text']):
+                yield token
+        yield {'text': '.'}
 
 
     def run(self) -> None:
@@ -346,46 +334,30 @@ class AdvancedMorphologicalAnalysisPipeline(MorphologicalAnalysisPipeline):
         """
         Returns the text representation as the list of ConlluSentence
         """
-        sentences = []
-        result = self._mystem_analyzer.analyze(re.sub(r'\W+', ' ', text))
-        token_count = 0
+        conllu_sentences = []
+        result = (i for i in self._mystem_analyzer.analyze(text))
         for sentence_position, sentence in enumerate(split_by_sentence(text)):
             conllu_tokens = []
-            for token_position, token in enumerate(re.findall(r'\w+', sentence), start=1):
-                conllu_token = ConlluToken(token)
-                if not result[token_count]['text'].isalnum():
-                    token_count += 1
-                if 'analysis' in result[token_count] and result[token_count]['analysis']:
-                    pos = self._converter.convert_pos(result[token_count]['analysis'][0]['gr'])
+            for token_position, token in enumerate(self.get_sentence_tokens(result, sentence), start=1):
+                if 'analysis' in token and token['analysis']:
+                    pos = self._converter.convert_pos(token['analysis'][0]['gr'])
                     if pos == 'NOUN':
-                        lex = self._backup_analyzer.parse(result[token_count]['text'])[0].normal_form
-                        open_corpora_tags = self._backup_analyzer.parse(result[token_count]['text'])[0].tag
+                        lex = self._backup_analyzer.parse(token['text'])[0].normal_form
+                        open_corpora_tags = self._backup_analyzer.parse(token['text'])[0].tag
                         pos = self._backup_tag_converter.convert_pos(open_corpora_tags)
                         tags = self._backup_tag_converter.convert_morphological_tags(open_corpora_tags)
                     else:
-                        tags = self._converter.convert_morphological_tags(result[token_count]['analysis'][0]['gr'])
-                        lex = result[token_count]['analysis'][0]['lex']
-                elif result[token_count]['text'].isdigit():
-                    lex = result[token_count]['text']
-                    pos = 'NUM'
-                    tags = ''
+                        lex = token['analysis'][0]['lex']
+                        tags = self._converter.convert_morphological_tags(token['analysis'][0]['gr'])
                 else:
-                    lex = result[token_count]['text']
-                    pos = 'X'
-                    tags = ''
-                morph_params = MorphologicalTokenDTO(lex, pos, tags)
-                conllu_token.set_position(token_position)
-                conllu_token.set_morphological_parameters(morph_params)
+                    tags, lex = '', token['text']
+                    pos = self._analyze_unknown(lex)
+                conllu_token = self._create_conllu_token(token_position, token['text'], lex, pos, tags)
                 conllu_tokens.append(conllu_token)
-                token_count += 1
-            end_token = ConlluToken('.')
-            end_token.set_position(token_position + 1)
-            morph_params = MorphologicalTokenDTO('.', 'PUNCT')
-            end_token.set_morphological_parameters(morph_params)
-            conllu_tokens.append(end_token)
-            sentence = ConlluSentence(sentence_position, sentence, conllu_tokens)
-            sentences.append(sentence)
-        return sentences
+            conllu_sentence = ConlluSentence(sentence_position, sentence, conllu_tokens)
+            conllu_sentences.append(conllu_sentence)
+        return conllu_sentences
+
 
     def run(self) -> None:
         """
