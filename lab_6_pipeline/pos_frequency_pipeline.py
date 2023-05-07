@@ -31,7 +31,7 @@ def from_conllu(path: Path, article: Optional[Article] = None) -> Article:
         content = f.read()
     extracted_sentences = extract_sentences_from_raw_conllu(content)
     for sentence in extracted_sentences:
-        sentence['tokens'] = [_parse_conllu_token(token) for token in  sentence['tokens']]
+        sentence['tokens'] = [_parse_conllu_token(token) for token in sentence['tokens']]
     conllu_sentences = [ConlluSentence(**sentence) for sentence in extracted_sentences]
     if not article:
         article_id = get_article_id_from_filepath(path)
@@ -88,7 +88,6 @@ class POSFrequencyPipeline:
             to_meta(article)
             visualize(article=article,
                       path_to_save=ASSETS_PATH / f'{article.article_id}_image.png')
-
 
     def _count_frequencies(self, article: Article) -> dict[str, int]:
         """

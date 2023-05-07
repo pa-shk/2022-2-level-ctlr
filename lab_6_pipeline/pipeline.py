@@ -53,7 +53,7 @@ class CorpusManager:
         if not self.path_to_raw_txt_data.is_dir():
             raise NotADirectoryError
         if not any(self.path_to_raw_txt_data.iterdir()):
-            raise  EmptyDirectoryError
+            raise EmptyDirectoryError
         meta_files = [i for i in self.path_to_raw_txt_data.glob(r'*_meta.json')]
         text_files = [i for i in self.path_to_raw_txt_data.glob(r'*_raw.txt')]
         if len(meta_files) != len(text_files):
@@ -69,7 +69,7 @@ class CorpusManager:
         Register each dataset entry
         """
         for path in self.path_to_raw_txt_data.glob('**/*.txt'):
-            if not (relevant:= re.search(r'(\d+)_raw', path.stem)):
+            if not (relevant := re.search(r'(\d+)_raw', path.stem)):
                 continue
             self._storage[int(relevant[1])] = from_raw(path)
 
@@ -78,6 +78,7 @@ class CorpusManager:
         Returns storage params
         """
         return self._storage
+
 
 class MorphologicalTokenDTO:
     """
@@ -91,6 +92,7 @@ class MorphologicalTokenDTO:
         self.lemma = lemma
         self.pos = pos
         self.tags = tags
+
 
 class ConlluToken:
     """
@@ -130,7 +132,7 @@ class ConlluToken:
         pos = self._morphological_parameters.pos
         xpos = '_'
         if include_morphological_tags and (tags := self._morphological_parameters.tags):
-                feats = tags
+            feats = tags
         else:
             feats = '_'
         head = '0'
@@ -145,6 +147,7 @@ class ConlluToken:
         Returns lowercase original form of a token
         """
         return re.sub(r'\W+', '', self._text).lower()
+
 
 class ConlluSentence(SentenceProtocol):
     """
@@ -182,7 +185,8 @@ class ConlluSentence(SentenceProtocol):
         return self._tokens
 
     def _format_tokens(self, include_morphological_tags: bool) -> str:
-        return  '\n'.join(i.get_conllu_text(include_morphological_tags) for i in self._tokens)
+        return '\n'.join(i.get_conllu_text(include_morphological_tags) for i in self._tokens)
+
 
 class MystemTagConverter(TagConverter):
     """
@@ -193,17 +197,37 @@ class MystemTagConverter(TagConverter):
         """
         Converts the Mystem tags into the UD format
         """
-        if re.match(r'\w+', tags)[0] in ["PART", "PR", "INTJ", "CONJ", "COM", "ADVPRO", "ADV"]:
+        categories = {
+            "NOUN": [self.case, self.number, self.gender, self.animacy],
+            "VERB": [self.tense, self.number, self.gender],
+            "ADJ": [self.case, self.number, self.gender],
+            "NUM": [self.case, self.number, self.gender],
+            "PRON": [self.case, self.number, self.gender, self.animacy],
+        }
+
+
+
+        pos = self.convert_pos(tags)
+        if pos in ["PART", "ADP",  "ADV", "CCONJ", "INTJ"]:
             return ''
+
         tags = re.sub(r'\((.+?)\|.+\)', r'\1', tags)
         extracted_tags = re.findall(r'[а-я]+', tags)
         ud_tags = {}
         for tag in extracted_tags:
-            for category in (self.case, self.number, self.gender, self.animacy, self.tense):
+            for category in (self.gender, self.animacy, self.case, self.number, self.tense):
+                if (pos == 'NOUN' or pos == 'PRON') and category == self.tense:
+                    continue
+                if (pos == 'ADJ' or pos == 'NUM') and category in [self.animacy, self.tense]:
+                    continue
+                if pos == 'VERB' and category in  [self.animacy, self.case]:
+                    continue
+                if pos == 'NUM' and category in [self.animacy, self.tense]:
+                    continue
                 if tag in self._tag_mapping[category]:
                     ud_tags[category] = self._tag_mapping[category][tag]
-        return '|'.join(f'{k}={v}' for k, v in sorted(ud_tags.items()))
 
+        return '|'.join(f'{k}={v}' for k, v in sorted(ud_tags.items()))
 
     def convert_pos(self, tags: str) -> str:  # type: ignore
         """
@@ -232,11 +256,12 @@ class OpenCorporaTagConverter(TagConverter):
             self.animacy: tags.animacy,
             self.case: tags.case,
             self.gender: tags.gender,
-            self.number:  tags.number
+            self.number: tags.number
         }
 
         return '|'.join(f'{category}={self._tag_mapping[category][value]}'
                         for category, value in parsed_tags.items() if value)
+
 
 class MorphologicalAnalysisPipeline:
     """
@@ -285,10 +310,10 @@ class MorphologicalAnalysisPipeline:
     @staticmethod
     def _analyze_unknown(lex):
         if lex == '.':
-            return  'PUNCT'
+            return 'PUNCT'
         if lex.isdigit():
             return 'NUM'
-        return  'X'
+        return 'X'
 
     @staticmethod
     def get_sentence_tokens(result, sentence) -> dict:
@@ -300,7 +325,6 @@ class MorphologicalAnalysisPipeline:
             if re.search(r'\w', token['text']):
                 yield token
         yield {'text': '.'}
-
 
     def run(self) -> None:
         """
@@ -315,6 +339,7 @@ class MorphologicalAnalysisPipeline:
             to_conllu(article,
                       include_morphological_tags=True,
                       include_pymorphy_tags=False)
+
 
 class AdvancedMorphologicalAnalysisPipeline(MorphologicalAnalysisPipeline):
     """
@@ -357,7 +382,6 @@ class AdvancedMorphologicalAnalysisPipeline(MorphologicalAnalysisPipeline):
             conllu_sentence = ConlluSentence(sentence_position, sentence, conllu_tokens)
             conllu_sentences.append(conllu_sentence)
         return conllu_sentences
-
 
     def run(self) -> None:
         """
