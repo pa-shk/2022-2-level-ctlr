@@ -219,6 +219,9 @@ class Crawler:
         if not parsed_url.netloc:
             return urlunparse((scheme, target_netloc, parsed_url.path,
                                None, None, None))
+
+        # page = make_request(url, Config(path_to_config=CRAWLER_CONFIG_PATH))
+        # article_bs = BeautifulSoup(page.content, "lxml")
         return url
 
     def find_articles(self) -> None:
@@ -263,9 +266,11 @@ class HTMLParser:
         """
         article_content = article_soup.find("div", class_="article__content")
         text_paragraphs = article_content.find_all("p")
-        self.article.text = ' '.join(i.text for i in text_paragraphs)
+        if text_paragraphs:
+            self.article.text = ' '.join(i.text for i in text_paragraphs)
+        else:
+            self.article.text = article_soup.find("div", class_="article__lead").text
         self.article.text = re.sub(r'\s+', ' ', self.article.text)
-
 
     def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
         """
