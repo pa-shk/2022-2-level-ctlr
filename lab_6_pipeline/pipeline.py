@@ -69,10 +69,8 @@ class CorpusManager:
         """
         Register each dataset entry
         """
-        for path in self.path_to_raw_txt_data.glob('**/*.txt'):
-            if not (relevant := re.search(r'(\d+)_raw', path.stem)):
-                continue
-            self._storage[int(relevant[1])] = from_raw(path)
+        for path in self.path_to_raw_txt_data.glob('*_raw.txt'):
+            self._storage[int(re.search(r'\d+', path.stem)[0])] = from_raw(path)
 
     def get_articles(self) -> dict:
         """
@@ -114,8 +112,8 @@ class ConlluToken:
         """
         self._morphological_parameters = parameters
 
-    def set_position(self, postion: int) -> None:
-        self._position = postion
+    def set_position(self, position: int) -> None:
+        self._position = position
 
     def get_morphological_parameters(self) -> MorphologicalTokenDTO:
         """
@@ -199,22 +197,23 @@ class MystemTagConverter(TagConverter):
         Converts the Mystem tags into the UD format
         """
         pos = self.convert_pos(tags)
-        if pos in ["PART", "ADP", "ADV", "CCONJ", "INTJ"]:
+
+        pos_categories = {
+            "NOUN": [self.case, self.number, self.gender, self.animacy],
+            "VERB": [self.tense, self.number, self.gender],
+            "ADJ": [self.case, self.number, self.gender],
+            "NUM": [self.case, self.number, self.gender],
+            "PRON": [self.case, self.number, self.gender, self.animacy],
+        }
+
+        if pos not in pos_categories:
             return ''
 
         tags = re.sub(r'\((.+?)\|.+\)', r'\1', tags)
         extracted_tags = re.findall(r'[а-я]+', tags)
         ud_tags = {}
         for tag in extracted_tags:
-            for category in (self.animacy, self.case, self.gender, self.number, self.tense):
-                if (pos == 'NOUN' or pos == 'PRON') and category == self.tense:
-                    continue
-                if (pos == 'ADJ' or pos == 'NUM') and category in [self.animacy, self.tense]:
-                    continue
-                if pos == 'VERB' and category in [self.animacy, self.case]:
-                    continue
-                if pos == 'NUM' and category in [self.animacy, self.tense]:
-                    continue
+            for category in pos_categories[pos]:
                 if tag in self._tag_mapping[category]:
                     ud_tags[category] = self._tag_mapping[category][tag]
 
@@ -290,21 +289,19 @@ class MorphologicalAnalysisPipeline:
             conllu_sentences.append(conllu_sentence)
         return conllu_sentences
 
-    @staticmethod
-    def _create_conllu_token(postion: int, text: str, lex: str, pos: str, tags: str) -> ConlluToken:
+    def _create_conllu_token(self, position: int, text: str, lex: str, pos: str, tags: str) -> ConlluToken:
         """
         Creates a ConlluToken and fills its fields
         """
         conllu_token = ConlluToken(text)
         morph_params = MorphologicalTokenDTO(lex, pos, tags)
-        conllu_token.set_position(postion)
+        conllu_token.set_position(position)
         conllu_token.set_morphological_parameters(morph_params)
         return conllu_token
 
-    @staticmethod
-    def _analyze_unknown(lex: str) -> str:
+    def _analyze_unknown(self, lex: str) -> str:
         """
-        Deduces the part of spech of a lexeme
+        Deduces the part of speech of a lexeme
         if analyzer failed to do it
         """
         if lex == '.':
@@ -313,8 +310,7 @@ class MorphologicalAnalysisPipeline:
             return 'NUM'
         return 'X'
 
-    @staticmethod
-    def get_sentence_tokens(result: Generator, sentence: str) -> Generator[dict, None, None]:
+    def get_sentence_tokens(self, result: Generator, sentence: str) -> Generator[dict, None, None]:
         """
         Extracts all tokens containing either letters or numbers
         """
